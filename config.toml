@@ -1,7 +1,7 @@
 baseURL = "http://www.functionalstatistics.com"
 title = "Functional Statistics"
 
-theme = "hugo-coder"
+theme = "bslabs"
 
 languageCode = "en"
 defaultContentLanguage = "en"
