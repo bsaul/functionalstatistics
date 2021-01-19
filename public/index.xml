@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Functional Statistics</title>
+    <link>http://www.functionalstatistics.com/</link>
+    <description>Recent content on Functional Statistics</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 19 Jan 2021 09:19:14 -0500</lastBuildDate>
+    
+	<atom:link href="http://www.functionalstatistics.com/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>Permutation Weighting, Causal Inference, and Interference</title>
+      <link>http://www.functionalstatistics.com/posts/2021-01-19-permutation-weighting-causal/</link>
+      <pubDate>Tue, 19 Jan 2021 09:19:14 -0500</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/posts/2021-01-19-permutation-weighting-causal/</guid>
+      <description>One of my (many) side projects is estimating the effect of land conservation on outcomes such as deforestation. This is an exciting collaboration with Christophe Nolte at Boston University. I decided to use this project as an opportunity to refresh my knowledge on causal inference with interference (Hudgens and Halloran 2008) as well as take a closer look at several interesting articles that came across my desk. In this post, I try out the estimation framework in one of those articles and explore how it may be useful in the presence of interference.</description>
+    </item>
+    
+    <item>
+      <title>About Me</title>
+      <link>http://www.functionalstatistics.com/about/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/about/</guid>
+      <description>Research Interests  Statistical software Functional programming in R, Rust, Haskell Causal inference Ecology and conservation Category theory  </description>
+    </item>
+    
+    <item>
+      <title>Contact</title>
+      <link>http://www.functionalstatistics.com/contact/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/contact/</guid>
+      <description>Follow me, @bradleysaul.</description>
+    </item>
+    
+    <item>
+      <title>First snippet</title>
+      <link>http://www.functionalstatistics.com/snippets/first/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/snippets/first/</guid>
+      <description>This content is in snippets/first/index.md
+pwd </description>
+    </item>
+    
+    <item>
+      <title>Second snippet</title>
+      <link>http://www.functionalstatistics.com/snippets/second/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/snippets/second/</guid>
+      <description>This content is in snippets/second/index.md
+ls -la </description>
+    </item>
+    
+    <item>
+      <title>Software</title>
+      <link>http://www.functionalstatistics.com/software/</link>
+      <pubDate>Mon, 01 Jan 0001 00:00:00 +0000</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/software/</guid>
+      <description>geex (R) Framework for estimating parameters and the empirical sandwich covariance matrix from a set of unbiased estimating equations (i.e. M-estimation) in R.
+ github CRAN JSS paper  inferference (R) Provides methods for estimating causal effects in the presence of interference. Currently it implements the IPW estimators proposed by EJ Tchetgen Tchetgen and TJ Vanderweele in &amp;ldquo;On causal inference in the presence of interference&amp;rdquo; (Statistical Methods in Medical Research, 21(1) 55-75).</description>
+    </item>
+    
+  </channel>
+</rss>

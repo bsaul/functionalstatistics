@@ -14,7 +14,7 @@ body.colorscheme-dark {
     background-color: #424242;
     color: #dadada; }
   body.colorscheme-dark pre code {
-    background-color: inherit;
+    /* background-color: inherit; */
     color: inherit; }
   body.colorscheme-dark blockquote {
     border-left: 2px solid #424242; }
@@ -38,7 +38,7 @@ body.colorscheme-dark {
       background-color: #424242;
       color: #dadada; }
     body.colorscheme-auto pre code {
-      background-color: inherit;
+      /* background-color: inherit; */
       color: inherit; }
     body.colorscheme-auto blockquote {
       border-left: 2px solid #424242; }

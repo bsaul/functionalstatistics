@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Tags on Functional Statistics</title>
+    <link>http://www.functionalstatistics.com/tags/</link>
+    <description>Recent content in Tags on Functional Statistics</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 19 Jan 2021 09:19:14 -0500</lastBuildDate>
+    
+	<atom:link href="http://www.functionalstatistics.com/tags/index.xml" rel="self" type="application/rss+xml" />
+    
+    
+    <item>
+      <title>causal inference</title>
+      <link>http://www.functionalstatistics.com/tags/causal-inference/</link>
+      <pubDate>Tue, 19 Jan 2021 09:19:14 -0500</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/tags/causal-inference/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>permutation weighting</title>
+      <link>http://www.functionalstatistics.com/tags/permutation-weighting/</link>
+      <pubDate>Tue, 19 Jan 2021 09:19:14 -0500</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/tags/permutation-weighting/</guid>
+      <description></description>
+    </item>
+    
+    <item>
+      <title>simulations</title>
+      <link>http://www.functionalstatistics.com/tags/simulations/</link>
+      <pubDate>Tue, 19 Jan 2021 09:19:14 -0500</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/tags/simulations/</guid>
+      <description></description>
+    </item>
+    
+  </channel>
+</rss>

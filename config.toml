@@ -17,9 +17,9 @@ ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_cache$", "\\.knit\\.md$", "\\.utf8\
 
 [params]
     author = "Bradley Saul"
-    description = "Bradley Saul's functional statistics"
+    description = "Functional Programming, Causal Inference, Ecology and Conservation"
     keywords = "blog,developer,statistian"
-    info = "Statistician, Functional Programmer, Scientist"
+    info = "Statistician, Functional Programmer"
     avatarURL = "images/avatar.jpg"
     #gravatar = "john.doe@example.com"
     footerContent = ""
@@ -30,7 +30,13 @@ ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_cache$", "\\.knit\\.md$", "\\.utf8\
     hideCredits = false
     hideCopyright = false
     since = 2021
-
+    
+    # options for highlight.js (version, additional languages, and theme)
+    highlightjsVersion = "9.12.0"
+    highlightjsCDN = "//cdnjs.cloudflare.com/ajax/libs"
+    highlightjsLang = ["r", "yaml"]
+    highlightjsTheme = "github"
+    
     # Git Commit in Footer, uncomment the line below to enable it.
     commit = "https://github.com/luizdepra/hugo-coder/tree/"
 

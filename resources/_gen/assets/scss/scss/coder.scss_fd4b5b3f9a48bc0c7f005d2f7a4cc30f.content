@@ -101,7 +101,7 @@ pre {
   margin: 0; }
   pre code {
     display: inline-block;
-    background-color: inherit;
+    /* background-color: inherit;  */
     color: inherit; }
 
 code {

@@ -1,0 +1,401 @@
+---
+title: "Permutation Weighting, Causal Inference, and Interference"
+author: "Bradley Saul"
+date: 2021-01-19T09:19:14-05:00
+bibliography: post.bib
+#categories: ["causal"]
+tags: ["causal inference", "permutation weighting", "simulations"]
+editor_options: 
+  chunk_output_type: console
+---
+
+<script src="index_files/header-attrs/header-attrs.js"></script>
+
+
+<p>One of my (many) side projects is estimating the effect of land conservation on outcomes such as deforestation. This is an exciting collaboration with <a href="https://placeslab.org/people/">Christophe Nolte</a> at Boston University. I decided to use this project as an opportunity to refresh my knowledge on causal inference with interference <span class="citation">(Hudgens and Halloran 2008)</span> as well as take a closer look at several interesting articles that came across my desk. In this post, I try out the estimation framework in one of those articles and explore how it may be useful in the presence of interference.</p>
+<p>Equation (2) in <span class="citation">Arbour, Dimmery, and Sondhi (2020)</span> expresses an estimand I’m all too familiar with in a way I had not seen previously</p>
+<p><span class="math inline">\(E\left[\frac{y_i \Pr(\mathbb{a}_i)}{\Pr(\mathbb{a}_i | \mathbb{x}_i)}\right] = E\left[\frac{y_i \Pr(\mathbb{a}_i) \Pr(\mathbb{x}_i)}{\Pr(\mathbb{a}_i, \mathbb{x}_i)}\right]\)</span></p>
+<p>The left hand quantity is the standard (stabilized) inverse probability estimand, and this equals the right hand side simply by the <a href="https://en.wikipedia.org/wiki/Conditional_probability">definition of conditional probability</a>: <span class="math inline">\(\Pr(A|X) = \Pr(A,X)/\Pr(X)\)</span>. In itself this identity seems interesting but trivial, but <span class="citation">Arbour, Dimmery, and Sondhi (2020)</span> show how one can estimate the ratio of the product density (<span class="math inline">\(\Pr(A) \Pr(X)\)</span>) and the joint density (<span class="math inline">\(\Pr(A, X)\)</span>) using methods of <a href="https://scholar.google.com/scholar?q=density+ratio+estimation&amp;hl=en&amp;as_sdt=0&amp;as_vis=1&amp;oi=scholart">density ratio estimation</a>. This opens up a powerful (and new to me) way to estimate causal quantities.</p>
+<p>An obvious problem is that the observed data is a good stand-in for the joint density, but how does one get the product density. The trick is to permute treatment assignment, which breaks the dependence between <span class="math inline">\(A\)</span> and <span class="math inline">\(X\)</span>.</p>
+<p>In this post, I create a toy interference simulation and look at the operating characteristics of the permutation weighting approach.</p>
+<div id="simulation-setup" class="section level1">
+<h1>Simulation Setup</h1>
+<p>The toy simulation is similar to <span class="citation">Liu et al. (2019)</span> with the exception that the interference structure based on network adjacency of units rather than groups of units (i.e. partial interference). I also include an extra covariate that introduces confounding between units.</p>
+<ul>
+<li>Fix an adjacency matrix <span class="math inline">\(E\)</span> with <span class="math inline">\(n\)</span> units with the number of edges for any given unit between 1 and <code>max_degree</code>.</li>
+<li>Sample exposure <span class="math inline">\(A\)</span> from a Bernoulli distribution with probability:
+<span class="math inline">\(\text{logit}^{-1}([1, |Z_1|, Z_2, |Z_1|Z_2, Z_3] \gamma)\)</span>
+<ul>
+<li><span class="math inline">\(Z_1 \sim N(0, 1)\)</span>, <span class="math inline">\(Z_2 \sim Bern(0.5)\)</span>, and <span class="math inline">\(Z_3 = |Z_1| E\)</span>.</li>
+<li><span class="math inline">\(Z_3\)</span> (the total <span class="math inline">\(|Z_1|\)</span> of a unit’s neighbors) introduces confounding between units.</li>
+</ul></li>
+<li>Generate the outcome <span class="math inline">\(Y \sim N([1, A, f(\tilde{A}), |Z_1|, Z_2, |Z_1|Z_2, Z_3] \beta , 1)\)</span>
+<ul>
+<li>where <span class="math inline">\(\tilde{A}\)</span> is the treatment vector of a unit’s neighbors and <span class="math inline">\(f(\tilde{A})\)</span> is the proportion of neighbors treated</li>
+</ul></li>
+</ul>
+<pre class="r"><code>library(magrittr)
+
+# Generate adjacency matrix for `n` units with a maximum of `max_degree` edges for
+# any given vertex.
+gen_edges &lt;- function(n, max_degree){
+
+  sample.int(max_degree, size = n, replace = TRUE) %&gt;%
+    {
+      # sum(out.deg) must be even for sample_degseg
+      x &lt;- .
+      x[1] &lt;- `if`(
+        (sum(x) %% 2) != 0,
+        x[1] + 1,
+        x[1]
+      )
+      x
+    } %&gt;%
+    igraph::sample_degseq(method = &quot;simple.no.multiple&quot;) %&gt;%
+    igraph::simplify() %&gt;%
+    igraph::get.adjacency()
+}
+
+# Generate data
+gen_data &lt;- function(edges, gamma, beta){
+
+  n &lt;- nrow(edges)
+
+  dplyr::tibble(
+    # Number of connections
+    m_i  = as.numeric(edges %*% rep(1, n)),
+
+    # Correctly specified
+    Z1  = rnorm(n, sd = 1),
+    Z1_abs = abs(Z1),
+    Z2  = rbinom(n, size = 1, prob = .5),
+    Z3  = as.numeric(edges %*% Z1_abs), 
+    
+    # Misspecified
+    X1  = exp(Z1/2),
+    X2  = plogis(Z2) * Z1,
+    X3  = exp(Z3/2),
+    
+    Alp = as.numeric(cbind(1, Z1_abs, Z2, Z1_abs*Z2, Z3) %*% gamma),
+    p   = plogis(Alp),
+    A   = rbinom(n, size = 1, prob = p),
+    
+    # Number of treated neighbors
+    A_n = as.numeric(edges %*% A),
+    # Proportion of neighbors treated
+    fA  = A_n/m_i,
+    Ylp = cbind(1, A, fA, Z1_abs, Z2, Z1_abs*Z2, Z3) %*% beta,
+    Y   = rnorm(n, mean = Ylp, sd = 1)
+  ) -&gt;
+    out
+  
+  list(
+    data  = out,
+    edges = edges
+  )
+}</code></pre>
+</div>
+<div id="estimation" class="section level1">
+<h1>Estimation</h1>
+<p>My goal is to recover the causal direct effect <span class="math inline">\(\beta_1\)</span> and the spillover effect (<span class="math inline">\(\beta_2\)</span>) using various weighting techniques on the following marginal structural model:</p>
+<p><span class="math display">\[
+E[Y(a, f(\tilde{a}))] = \theta_0 + \theta_1 a + \theta_2 f(\tilde{a}),
+\]</span></p>
+<p>which under standard causal identifiability assumptions <span class="math inline">\(\theta_1 = \beta_1\)</span> and <span class="math inline">\(\theta_2 = \beta_2\)</span>.</p>
+<p>I’ll try:</p>
+<ul>
+<li>a naive (unweighted) estimator</li>
+<li>a basic inverse probability of treatment estimator</li>
+<li>permutation weighting</li>
+</ul>
+<p>I’ll also see how these estimators perform under mispecification of the functional form of the covariates. I’m just going to examine the bias of these estimators in this post. My hypotheses, based on the results in <span class="citation">Arbour, Dimmery, and Sondhi (2020)</span>, are:</p>
+<ul>
+<li>permutation weighting will have similar bias to the IPW estimator for <span class="math inline">\(\theta_1\)</span>;</li>
+<li>the standard IPW estimator will be biased for <span class="math inline">\(\theta_2\)</span>, but permutation weighting should be relatively consistent.</li>
+</ul>
+<div id="naive-estimator" class="section level2">
+<h2>Naive estimator</h2>
+<pre class="r"><code>naivimator &lt;- function(simdata){
+  lm(Y ~ A + fA, data = simdata[[&quot;data&quot;]], weights = NULL)
+}</code></pre>
+</div>
+<div id="ipw-estimator" class="section level2">
+<h2>IPW estimator</h2>
+<pre class="r"><code>make_ipw_mator &lt;- function(pformula = ~ Z1_abs*Z2 + Z3){
+  function(simdata){
+    df &lt;- simdata[[&quot;data&quot;]]
+    m &lt;- glm(update(A ~ ., pformula), data = df, family = binomial)
+    nu &lt;- dbinom(df[[&quot;A&quot;]], size = 1,  prob = mean(df[[&quot;A&quot;]]))
+    de &lt;- dbinom(df[[&quot;A&quot;]], size = 1,
+                prob = predict(m, newdata = df, type = &quot;response&quot;))
+    
+    lm(Y ~ A + fA, data = df, weights = nu/de)
+  }
+}</code></pre>
+</div>
+<div id="permutation-weighting" class="section level2">
+<h2>Permutation weighting</h2>
+<p>Below are my quick and dirty functions used to carry out permutation weighting:</p>
+<pre class="r"><code># Permutes the treatment vector and recomputes the proportion of neighbors 
+# treated.
+permute_A &lt;- function(simdt){
+  
+  permutation &lt;- sample.int(nrow(simdt[[&quot;data&quot;]]), replace = FALSE)
+  
+  simdt[[&quot;data&quot;]] %&gt;%
+    dplyr::mutate(
+      A = A[permutation],
+      A_n = as.numeric(simdt[[&quot;edges&quot;]] %*% A),
+      fA  = A_n/m_i,
+    ) 
+}
+
+# Stack the observed data with the permuted data
+permute_and_stack &lt;- function(simdt){
+  dplyr::bind_rows(
+    dplyr::mutate(simdt[[&quot;data&quot;]],  C = 0),
+    dplyr::mutate(permute_A(simdt), C = 1)
+  ) 
+}
+
+# Estimate the density ratio by modeling whether an observation is from 
+# the permuted dataset or original dataset
+.pw &lt;- function(simdt, rhs_formula, fitter){
+  m  &lt;- fitter(formula = update(C ~ 1, rhs_formula), 
+               data    = permute_and_stack(simdt))
+  w  &lt;- predict(object = m, newdata = simdt[[&quot;data&quot;]], type = &quot;response&quot;) 
+  w/(1 - w)
+}
+
+# Estimate permutation weights B times and average the results
+get_permutation_weights &lt;- function(simdt, B, rhs_formula, fitter){
+  replicate(
+    n    = B,
+    expr = .pw(simdt, rhs_formula = rhs_formula, fitter  = fitter)
+  ) %&gt;% 
+    apply(1, mean)
+}
+
+# Estimate weights by GLM
+glm_fitter &lt;- function(formula, data){
+  glm(formula = formula, data = data, family = binomial)
+}
+
+# Create a permutation weighted estimator for the marginal structural model
+make_pw_estimator &lt;- function(fitter, rhs_formula, B){
+  function(simdata){
+    w &lt;- get_permutation_weights(simdt = simdata,
+        B = B, rhs_formula = rhs_formula, fitter  = fitter)
+    
+    lm(Y ~ A + fA, 
+       data = simdata[[&quot;data&quot;]],
+       weights = w)
+  }
+}</code></pre>
+</div>
+</div>
+<div id="simulator" class="section level1">
+<h1>Simulator</h1>
+<p>I run the simulation 250 times for <span class="math inline">\(n = 1000\)</span> units for a single fixed adjacency matrix. For the permutation weighting, I average over 25 permutation (since this is just blog post to see how the tool works).</p>
+<pre class="r"><code>get_metrics &lt;- function(res, oracle){
+  estimate &lt;- coef(res)[c(&quot;A&quot;, &quot;fA&quot;)]
+  
+  dplyr::tibble(
+    parameter = names(oracle),
+    bias      = estimate - oracle
+  )
+}
+
+do_sim &lt;- function(sim_parms, oracle, estimators){
+  df &lt;- do.call(gen_data, args = sim_parms[c(&quot;gamma&quot;, &quot;beta&quot;, &quot;edges&quot;)])
+  
+  purrr::map_dfr(
+    .x  = estimators,
+    .f  = ~ get_metrics(.x(simdata = df), oracle = oracle),
+    .id = &quot;method&quot;
+  )
+}
+
+make_parameter_maker &lt;- function(edges){
+  function(A, fA){
+    list(
+      gamma = c(0.1, 0.2, 0, 0.2, 0.2),
+      beta  = c(2, A, fA, -1.5, 2, -3, -3),
+      edges = edges
+    )
+  }
+}
+
+estimators &lt;- list(
+  naive = naivimator,
+  ipw_correct_spec = make_ipw_mator(),
+  ipw_mis_spec = make_ipw_mator(~ X1*X2*X3 + X1^2 + X2^2 + X3^2),
+  pw_glm_correct_spec = make_pw_estimator(
+    glm_fitter, ~ (A + fA)*(Z1_abs*Z2 + Z3), B = 25),
+  pw_glm_miss_spec = make_pw_estimator(
+    glm_fitter, ~ (A +fA)*(X1*X2*X3 + X1^2 + X2^2 + X3^2), B = 25)
+)
+
+parms &lt;- 
+  gen_edges(n = 1000, 5) %&gt;%
+  make_parameter_maker()
+
+do_sims &lt;- function(nsims, setting, estimators){
+  purrr::map_dfr(
+    .x = 1:nsims,
+    .f = ~ {
+          pms &lt;- do.call(parms, args = as.list(setting))
+          do_sim(
+            sim_parms  = pms,
+            oracle     = setting,
+            estimators = estimators
+          )
+    })
+}</code></pre>
+<p>Lastly, I run the simulations for three values of <span class="math inline">\((\beta_1, \beta_2)\)</span>: a direct effect only, an indirect effect only, and both effects present.</p>
+<pre class="r"><code>settings &lt;- list(
+  direct   = c(A = 2, fA = 0),
+  indirect = c(A = 0, fA = 2),
+  both     = c(A = 2, fA = 1)
+)
+
+res &lt;- purrr::map_dfr(
+  .x = settings,
+  .f = ~ do_sims(250, .x, estimators),
+  .id = &quot;setting&quot;
+)</code></pre>
+</div>
+<div id="results" class="section level1">
+<h1>Results</h1>
+<p>The following figure shows the bias for each simulation</p>
+<pre class="r"><code>library(ggplot2)
+ggplot(
+  data = res,
+  aes(x = parameter, y = bias)
+) + 
+  geom_hline(yintercept = 0) +
+  geom_jitter(size = 0.2) +
+  facet_grid(setting ~ method)</code></pre>
+<p><img src="index_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+<p>This table shows the mean absolute bias over the simulations:</p>
+<pre class="r"><code>res %&gt;%
+  dplyr::group_by(setting, method, parameter) %&gt;%
+  dplyr::summarise(
+    mab = mean(abs(bias))
+  ) %&gt;%
+  tidyr::pivot_wider(
+    names_from = c(&quot;method&quot;),
+    values_from = &quot;mab&quot;
+  ) %&gt;%
+  knitr::kable(
+    caption = &quot;mean absolute bias by setting/method&quot;,
+    digits = 2
+  )
+## `summarise()` regrouping output by &#39;setting&#39;, &#39;method&#39; (override with `.groups` argument)</code></pre>
+<table style="width:100%;">
+<caption><span id="tab:unnamed-chunk-8">Table 1: </span>mean absolute bias by setting/method</caption>
+<colgroup>
+<col width="9%" />
+<col width="10%" />
+<col width="18%" />
+<col width="14%" />
+<col width="6%" />
+<col width="21%" />
+<col width="18%" />
+</colgroup>
+<thead>
+<tr class="header">
+<th align="left">setting</th>
+<th align="left">parameter</th>
+<th align="right">ipw_correct_spec</th>
+<th align="right">ipw_mis_spec</th>
+<th align="right">naive</th>
+<th align="right">pw_glm_correct_spec</th>
+<th align="right">pw_glm_miss_spec</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td align="left">both</td>
+<td align="left">A</td>
+<td align="right">0.11</td>
+<td align="right">0.28</td>
+<td align="right">1.71</td>
+<td align="right">0.12</td>
+<td align="right">0.39</td>
+</tr>
+<tr class="even">
+<td align="left">both</td>
+<td align="left">fA</td>
+<td align="right">1.13</td>
+<td align="right">1.16</td>
+<td align="right">1.10</td>
+<td align="right">0.18</td>
+<td align="right">0.37</td>
+</tr>
+<tr class="odd">
+<td align="left">direct</td>
+<td align="left">A</td>
+<td align="right">0.10</td>
+<td align="right">0.29</td>
+<td align="right">1.68</td>
+<td align="right">0.10</td>
+<td align="right">0.39</td>
+</tr>
+<tr class="even">
+<td align="left">direct</td>
+<td align="left">fA</td>
+<td align="right">1.05</td>
+<td align="right">1.06</td>
+<td align="right">1.02</td>
+<td align="right">0.15</td>
+<td align="right">0.37</td>
+</tr>
+<tr class="odd">
+<td align="left">indirect</td>
+<td align="left">A</td>
+<td align="right">0.10</td>
+<td align="right">0.32</td>
+<td align="right">1.70</td>
+<td align="right">0.12</td>
+<td align="right">0.42</td>
+</tr>
+<tr class="even">
+<td align="left">indirect</td>
+<td align="left">fA</td>
+<td align="right">1.08</td>
+<td align="right">1.10</td>
+<td align="right">1.05</td>
+<td align="right">0.17</td>
+<td align="right">0.37</td>
+</tr>
+</tbody>
+</table>
+</div>
+<div id="conclusions-and-future-work" class="section level1">
+<h1>Conclusions and Future Work</h1>
+<p>The results confirmed by hypotheses, at least for my relatively simple simulation set up. Most importantly, though, the permutation approach can yield consistent estimators for parameters corresponding to the exposure of other units (i.e. interference effects). This makes sense to me, as permuting the vector <span class="math inline">\(A\)</span> artificially creates a product distribution <span class="math inline">\(\Pr(A)P(X) = \Pr(A_i, \tilde{A}_i)\Pr(X)\)</span> for all <span class="math inline">\(i\)</span>. Also, the permutation approach appears more robust to mispecification.</p>
+<p>Next steps are to:</p>
+<ul>
+<li>Create a simulator better motivated by the spatial interference problem I’m working.</li>
+<li>Compare permutation weighting to the spatial interference approach of <span class="citation">Giffin and others (2020)</span> where they estimate <span class="math inline">\(\Pr(A_i, \tilde{A}_i | X)\)</span> by assuming <span class="math inline">\(\Pr(A_i, \tilde{A}_i | X) = \Pr(A_i | X)\Pr(\tilde{A}_i | X)\)</span> and modeling each marginal directly.</li>
+<li>Dig into variance estimation.</li>
+</ul>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references hanging-indent">
+<div id="ref-arbour2020permutation">
+<p>Arbour, David, Drew Dimmery, and Arjun Sondhi. 2020. “Permutation Weighting.” <em>arXiv Preprint</em>.</p>
+</div>
+<div id="ref-giffin2020generalized">
+<p>Giffin, A. B., and others. 2020. “Generalized Propensity Score Approach to Causal Inference with Spatial Interference.” <em>arXiv Preprint</em>.</p>
+</div>
+<div id="ref-hudgens2008towards">
+<p>Hudgens, Michael G., and M. Elizabeth Halloran. 2008. “Towards Causal Inference with Interference.” <em>Journal of the American Statistical Association</em> 103 (482).</p>
+</div>
+<div id="ref-liu2019doubly">
+<p>Liu, Lan, Michael G. Hudgens, Bradley Saul, John D. Clemens, Mohammad Ali, and Michael E. Emch. 2019. “Doubly Robust Estimation in Observational Studies with Partial Interference.” <em>Stat</em> 8 (1): e214.</p>
+</div>
+</div>
+</div>
