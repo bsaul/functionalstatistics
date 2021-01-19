@@ -143,10 +143,10 @@ ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_cache$", "\\.knit\\.md$", "\\.utf8\
             weight = 2
             url = "posts/"
 
-            [[languages.en.menu.main]]
-            name = "Research"
-            weight = 3
-            url = "research/"
+            #[[languages.en.menu.main]]
+            #name = "Research"
+            #weight = 3
+            #url = "research/"
 
 
             [[languages.en.menu.main]]
