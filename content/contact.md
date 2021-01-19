@@ -3,4 +3,5 @@ slug: contact
 title: Contact
 ---
 
-Follow me, @bradleysaul.
+* Email: bradleysaul@gmail.com
+* Twitter: [@bradleysaul](https://twitter.com/bradleysaul)
