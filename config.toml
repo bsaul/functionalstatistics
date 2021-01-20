@@ -20,7 +20,7 @@ ignoreFiles = ["\\.Rmd$", "\\.Rmarkdown$", "_cache$", "\\.knit\\.md$", "\\.utf8\
     description = "Functional Programming, Causal Inference, Ecology and Conservation"
     keywords = "blog,developer,statistian"
     info = "Statistician, Functional Programmer"
-    avatarURL = "images/avatar.jpg"
+    avatarURL = "images/babytar.jpg"
     #gravatar = "john.doe@example.com"
     footerContent = ""
 
