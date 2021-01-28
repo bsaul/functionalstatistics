@@ -1,0 +1,259 @@
+---
+title: "Creating a Plasmode Simulator for Comparing Causal Estimators with Spatial Interference"
+author: "Bradley Saul"
+date: 2021-01-27T09:19:14-05:00
+bibliography: post.bib
+#categories: ["causal"]
+tags: ["causal inference", "plasmode", "simulation", "interference", "R"]
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(collapse = TRUE)
+```
+
+Most statistical methods papers include simulations to check the operating characteristics of the proposed methods. Data generating mechanisms for these simulations are often contrived as mixtures from known parametric distributions. While these simulators do the job, in this post, I demonstrate a simulation technique designed to increase the versimilitude to the study data actually collected. I've used this approach in the past, but only recently learned a name for it: plasmode simulation.
+
+As best I can tell, @cattell1967general coined the term:
+
+> A plasmode is defined as a set fo numerical value fitting a mathematic-theoretical model. That it fits the model may be know either because simulated data is produced mathematically to fit the functions, or because we have a real--usually mechanical--situation which we know with certainy produce data of that kind.
+
+I don't have the full paper, so I'm curious why they choose the word _plasmode_. My guess is the etymology is related to the Latin root meaning to form or mold, but the [OED entry for plasmode](https://www.oed.com/view/Entry/236355?redirectedFrom=plasmode#eid) labels _plasmode_ as a variant of _plasmodium_, the genus of unicelluar eukaryotes. Whatever the reason, the label seems to be [gaining traction](https://scholar.google.com/scholar?hl=en&as_sdt=0,34&q=plasmode) in the scientific literature. 
+
+In this post, I walk through my process for creating a simulator that I will use to benchmark  estimators of causal effects under [interference](@hudgens2008towards) for an analysis I'm working on. In my [last post](posts/2021-01-19-permutation-weighting-causal/), I gave an example of one of the estimators I plan to examine using an artificial simulation. 
+
+# Motivation
+
+I'm working on a [project](https://github.com/bsaul/conservation_spillover) to estimate causal effects of parcel-level land conservation policies on land change outcomes [the data comes from @nolte2019voluntary]. Interference arises here because it is certainly plausible, for example, that a parcel's conservation easement may affect development on neighboring parcels. I hope to develop (or use existing) estimators that can handle the spatial structure of this interference. Spatial interference has been getting more attention recently (see, e.g., @verbitsky-savitz2012causal, @osama2019inferring, @reich2020a-review, @giffin2020generalized). This project continues this line of research, and for the project I want to benchmark the estimators using data that resembles the actual data collected by @nolte2019voluntary.
+
+# Simulation Framework
+
+The basic approach is this:
+
+1. Create the analytic dataset.
+2. Fit somewhat complicated but *parametric* model (such as a Generalized Additive Model [@wood2017gam]) for both exposure assignment and the outcome in such a way that you can twiddle with parameters from the fitted models and produce simulated data from your hypothesized causal model. In my case, my assumed model is a marginal structural model: 
+
+\[
+E[Y(a, \tilde{a})] = \theta_0 + \theta_1 a + \theta_2 f(\tilde{a})
+\]
+
+where $Y(a, \tilde{a})$ is the potential outcome given a parcel's exposure $a$ and a function of the exposure of other parcels ($\tilde{a}$).
+
+3. Sample from the analytic dataset and pass covariates into the predictor functions from the fitted models in the last step to produce a simulated dataset. 
+4. Repeat step 3 as desired for benchmarking and twiddling with parameter settings.
+
+Regarding step 3, @franklin2014plasmode sampled with replacement from the underlying dataset. Since I want to preserve the spatial structure of my data, I instead take a spatially balanced [@robertson2013bas] sample of parcel polygons then for each sampled parcel, I create a basis for a simulation from all the parcels intersecting or within a buffer around the sampled parcel. This will hopefully be more clear in the code below.
+
+# Code
+
+I present this code for demonstration, but hopefully there are helpful tidbits. Like many analyses, the code is mostly idiosyncratic to the analysis. The code for creating the analysis dataset can be found in the [project's github](https://github.com/bsaul/conservation_spillover) repository.
+
+> Note: The `basisdt` object is quite large, and I don't want to store the file in git. Hence, I built this `.Rmd` locally and (for shame) hardcoding the file path. To actually run the code below, you'll need to run the data processing scripts in [project's github](https://github.com/bsaul/conservation_spillover) `scripts` directory to create the `basisdt` object.
+
+```{r, echo=FALSE, message=FALSE}
+library(sf)
+route <-"~/Dropbox/Research/projects/conservation_spillover"
+basisdt    <- readRDS(file = here::here(route, "data/simulation_basisdt.rds"))
+simulator1 <- readRDS(here::here(route, "data/plasmode_simulator_1.rds"))
+ids        <- readRDS(here::here(route, "data/bas_3000_sample.rds"))
+```
+
+## Simulator functions
+
+I've written two key functions: `create_model_simulator` and `create_simulator`. The `create_model_simulator` function fits a `gam` model and returns a function (technically a closure) which can take new data as well as update parameters. Out of laziness, I'm updating parameters based on names, but if I were shipping this function I would clean it up quite a bit. 
+
+The `post` argument takes a function that can be used to modify the final output. I use this pattern a lot in my R programming: including an option to post (and/or pre) processing output (and/or input) from/to a function.
+
+```{r}
+create_model_simulator <- function(formula, data, family, post = identity){
+  m    <- mgcv::gam(formula = formula, data = data, family = family)
+  fm   <- formula(m)
+  beta <- coef(m)
+  inv  <- family()[["linkinv"]]
+  function(newdata, newparms){
+    X <- mgcv::gam(fm, data = newdata, family = family(), fit = FALSE)[["X"]]
+    beta[names(newparms)] <- newparms
+    post(inv(X %*% beta))
+  }
+}
+```
+
+Now I create simulator for the exposure and the outcome. The models are somewhat complicated in terms of the functional form of the predictors, but I don't want a model *too* complicated with hundreds of parameters, as I prefer predictions to be computationally fast.
+
+```{r, eval = FALSE}
+# Prediction models for simulation
+exposure_simulator <- 
+  create_model_simulator(
+    formula = A ~ log(ha)*slope + 
+      I(p_wet == 0) + p_wet + 
+      I(neighbor_p_wet == 0) + neighbor_p_wet + 
+      log1p(coast_2500) + travel +
+      s(log(ha)) +
+      s(slope) + 
+      s(p_wet) + 
+      s(travel),
+    data   = basisdt,
+    family = binomial,
+    # Generate 0/1 exposure
+    post   = function(x) { rbinom(length(x), size = 1, prob = x) }
+  )
+
+outcome_simulator <- create_model_simulator(
+  formula = d_forested ~
+    A*A_tilde + 
+    log(ha)*slope +
+    I(p_wet == 0) + p_wet +
+    I(neighbor_p_wet == 0) + neighbor_p_wet + 
+    log1p(coast_2500) + travel +
+    s(log(ha)) +
+    s(slope) +
+    s(p_wet) +
+    s(travel),
+  data   = basisdt,
+  family = gaussian,
+  # inv(X %*% beta) returns a 1D matrix, but I need a vector so drop
+  post   = drop
+)
+```
+
+The `create_simulator` function take the two model simulators above to produce `function` that can a simulated dataset given covariate data and optionally new parameters. In my case, the function is more complicated than simply simulating the exposure and outcome. The $f(\tilde{A})$ term needs to be recomputed after the exposure is generated but before the outcome is generated. Here, $f(\tilde{A})$ is the proportion of a parcel's boundary shared with treated parcels, thus in addition to covariates the basis data for a simulation needs to contain covariates plus parcel adjacency information (`neighbor_pids` in the code below).
+
+```{r}
+create_simulator <- function(exposure_sim, outcome_sim){
+  force(exposure_sim)
+  force(outcome_sim)
+  function(newdata, exposure_newparms = NULL, outcome_newparms = NULL){
+    df <- newdata
+    df[["A"]] <- exposure_sim(df, exposure_newparms)
+    df %>%
+      {
+        hold  <- .
+        
+        dplyr::mutate(
+          hold,
+          # Update treatment of neighbors
+          tr_neighbors = purrr::map(
+            .x = neighbor_pids,
+            .f = ~ hold[["A"]][hold[["pid"]] %in% .x]
+          )
+        )
+      } %>%
+      dplyr::mutate(
+        # Proportion of boundary shared with treated units
+        A_tilde = purrr::map2_dbl(
+          .x = tr_neighbors,
+          .y = neighbor_boundary_lengths,
+          .f = function(x, y){
+            `if`(length(x) == 0 || sum(as.numeric(y)) == 0, 
+                 0, sum(x * y)/sum(y))
+          })
+      ) ->
+      df
+    df[["Y"]] <- outcome_sim(df, outcome_newparms)
+    
+    df
+  }
+}
+```
+
+Now I can create my simulator:
+
+```{r, eval=FALSE}
+simulator1 <- create_simulator(exposure_simulator, outcome_simulator)
+```
+
+An advantage of having `create_simulator` return a closure is that I can save this
+closure to disk for use later within needing to refit models and reload large datasets.
+
+## Sampling
+
+I sample 3000 parcels. I may not need all these in the end, but better to sample extra now than need to go back later.
+
+```{r, eval=FALSE}
+frame <- sf::as_Spatial(sf::st_cast(basisdt$geometry, "POLYGON"))
+smpl  <- SDraw::sdraw(frame, n = 3000, type = "BAS")
+ids   <- basisdt$pid[as.integer(gsub("ID", "", smpl$geometryID))]
+```
+
+The sample indeed looks like Massachusetts:
+
+```{r}
+plot(basisdt$geometry[basisdt$pid %in% ids])
+```
+
+## Usage
+
+Now that I have "seed" parcels, I create simulated datasets by drawing a circle around a sampled parcel and taking all the parcels that are within or intersect the buffer. Creating the basis for a simulation requires an extra step here because the neighbors need to be updated after the sample is taken since all of a parcel's neighbors may not be in the sample (at the edges, for example).
+
+```{r}
+create_sim_basisdata <- function(seed_id, km_buffer){
+  # This depends on having basisdt in the search path (e.g. Global Environment)!
+  loc <- sf::st_buffer(basisdt$geometry[basisdt$pid == seed_id, "geometry"], 
+                       units::as_units(km_buffer, "km"))
+  prd <- 
+    drop(sf::st_intersects(basisdt$geometry, loc, sparse = FALSE)) |
+    drop(sf::st_within(basisdt$geometry, loc, sparse = FALSE)) 
+  
+  basisdt[prd, ] %>% 
+    {
+      hold <- .
+      hold %>%
+        dplyr::mutate(
+          neighbors_pids = purrr::map(
+            .x = neighbor_pids,
+            .f = ~ which(hold$pid %in% .x)
+          ),
+          neighbors = purrr::map(
+            .x = neighbor_pids,
+            .f = ~ which(hold$pid %in% .x)
+          ),
+          neighbor_boundary_lengths = purrr::map2(
+            .x = neighbor_boundary_lengths,
+            .y = neighbor_pids,
+            .f = ~ .x[.y %in% hold[["pid"]]]
+          )
+        )
+    } 
+}
+```
+
+Finally, I can create a simulation dataset. Here, I simulate data where there is no effect of the exposure by setting the parameters in the outcome model for `A`, `A_tilde`, and `A:A_tilde` to zero:
+
+```{r}
+simbasis <- create_sim_basisdata(seed_id = ids[1], km_buffer = 10)
+test <- simulator1(
+  simbasis, 
+  outcome_newparms = c(A = 0, A_tilde = 0, `A:A_tilde` = 0))
+```
+
+### Increasing confounding
+
+In the above simulation, a simple linear model which ignores confounding variables seems to recover the truth reasonably well:
+
+```{r}
+lm(Y ~ A*A_tilde, data = test)
+```
+
+However, I can make bias more obvious by twiddling with parameters on confounding variables; e.g.:
+
+```{r}
+test <- simulator1(
+  simbasis, 
+  exposure_newparms = c(`log(ha)` = 0.1),
+  outcome_newparms = c(A = 0.0, A_tilde = 0.0, `A:A_tilde` = 0.0, `log(ha)` = 0.1))
+
+lm(Y ~ A*A_tilde, data = test)
+```
+
+Now, to recover the true effects, we would certainly need methods for estimating causal effects when there is confounding. I don't show this here, but for example, the [permutation weighting approach](posts/2021-01-19-permutation-weighting-causal/) seems promising.
+
+# Summary
+
+* I sketched how to create simulators that are realistic (in some sense) to the data that is to be analyzed.
+* Some have called this "plasmode" simulation [see e.g., @gadbury2008evaluating; @franklin2014plasmode; @liu2019missing].
+* An advantage of this approach is that you can test your estimators on data that resembles the analysis data. You can see how the estimators perform under various assumed effect sizes and assumptions but twiddling with parameter settings.
+* A limitation of the approach is that the simulation may not make for good "overall" benchmarking of estimators, like @shimoni2018benchmarking tries to do.
+
+
+# References
