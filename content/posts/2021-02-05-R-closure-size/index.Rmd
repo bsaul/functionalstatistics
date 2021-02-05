@@ -1,0 +1,284 @@
+---
+title: "Closing in on understanding R closures"
+author: "Bradley Saul"
+date: 2021-02-05T09:19:14-05:00
+#categories: ["causal"]
+tags: ["R"]
+editor_options: 
+  chunk_output_type: console
+---
+
+A common and useful pattern I use in R programming is [currying](https://en.wikipedia.org/wiki/Currying) to create [closures](http://adv-r.had.co.nz/Functional-programming.html#closures) for later computation. This pattern is the main abstraction of my [geex](https://github.com/bsaul/geex) package, for example. At [NoviSci](https://www.novisci.com/) we use closures *all the time* in data pipelines. I think of a closure as a function `f` that returns another function `g`, where the returned `g` function (hopefully) has the data necessary to do its computation:
+
+```
+f <- function(oargs){
+   odata <- do_stuff_with(oargs)
+   function(iargs){ do_stuff_with(iargs, odata) }
+   
+}
+
+g <- f(...)
+# use g later on
+
+```
+
+This blog post addresses, in part, the "hopefully" in the last sentence. There are environment scoping details to consider to when creating a closure. For one, when calling `g(...)` the necessary data needs to be [in scope](https://bookdown.org/rdpeng/rprogdatascience/scoping-rules-of-r.html#scoping-rules). However, depending on the environments enclosed with `g`, the closure can also have more data than is necessary. This can lead to unnecessary memory bloat, which can have dramatic performance costs.
+
+I've been programming and developing in R for over ten years now, and I still find myself tripping up over R environments and scoping rules, especially when it comes to closures. Below I show a few ways to handle closure creation and look at their performance in terms of the following:
+
+1. size of closure after creation
+2. size of closure after being called for the first time
+3. size of closure when written to disk as an RDS
+
+* 1-3 after adding more objects to the Global environment
+* 1 \& 3 after tidying the Global environment as well as whether the closures still work
+
+My toy case is a function that takes a model object and simply returns its `formula`. Toying with a `formula` adds complexity as `formula` objects include a environment. From the docs:
+
+> A formula object has an associated environment, and this environment (rather than the parent environment) is used by model.frame to evaluate variables that are not found in the supplied data argument. Formulas created with the `~` operator use the environment in which they were created. Formulas created with as.formula will use the env argument for their environment.
+
+However, in many cases, we don't care about the attached environment, we care about the symbolic formula expression. The examples below demonstrate that we often need to think carefully when a closure especially when we want to save a closure to disk for sharing the file and reusing in different sessions. 
+
+```{r}
+library(purrr)
+
+# Create a couple of model objects to have in GlobalEnv
+m1 <- glm(Sepal.Width ~ 1, data = iris)
+m2 <- glm(Sepal.Length ~ 1, data = iris)
+```
+
+The first option `f0` implements perhaps the most straightforward approach: do all the work in the "inner" (call it `g0`) function. As we'll see, this is unsatisfactory, as if the model passed to `f0` is removed the `g0` function will no longer work.
+
+```{r}
+f0 <- function(model){
+  function(){
+    formula(model)
+  }
+}
+```
+
+Another approach moves the extraction of the formula from the model into the enclosing environment. This works, but as we'll see `g0` will carry along `model` in its environments, which for my purposes is unnecessary.
+
+```{r}
+f1 <- function(model){
+  fm <- formula(model)
+  function(){
+    fm
+  }
+}
+```
+
+The `f2` option removes `model` when `f2` exits.
+
+```{r}
+f2 <- function(model){
+  fm <- formula(model)
+  on.exit({ rm(model)} )
+  function(){
+    fm
+  }
+}
+```
+
+The `f3` and `f4` are me just seeing how the `update` function does or doesn't affect environments:
+
+```{r}
+f3 <- function(model){
+  fm <- update( . ~ ., formula(model))
+  function(){
+    fm
+  }
+}
+
+f4 <- function(model){
+  fm <- update( . ~ ., formula(model))
+  on.exit({ rm(model)})
+  function(){
+    fm
+  }
+}
+```
+
+I consider `f6` and `f7` poor practice: casting the formula to character then recasting. The `f5` function I consider OK: pulling out what I need (the expression) and throwing away the rest.
+
+```{r}
+f5 <- function(model){
+  fm <- rlang::expr(!! formula(model))
+  on.exit({ rm(model)})
+  function(){
+    as.formula(fm)
+  }
+}
+
+f6 <- function(model){
+  fm <- rlang::expr_text(formula(model))
+  function(){
+    as.formula(fm)
+  }
+}
+
+f7 <- function(model){
+  fm <- rlang::expr_text(formula(model))
+  on.exit({ rm(model)})
+  function(){
+    as.formula(fm)
+  }
+}
+```
+
+I got the idea for `f8`, wherein the environment for `g` is explicitly set, from [this stackoverflow post](https://stackoverflow.com/questions/58866842/how-to-clean-up-the-function-closure-environment-when-returning-and-saving-it). 
+
+```{r}
+f8 <- function(model){
+  fm <- formula(model)
+  f <- function(){
+    fm
+  }
+  
+  environment(f) <- list2env(list(fm = fm), parent = globalenv())
+  f
+}
+
+fs <- list(f0 = f0, f1 = f1, f2 = f2, f3 = f3, f4 = f4,
+           f5 = f5, f6 = f6, f7 = f7, f8 = f8)
+```
+
+Let's look at memory characteristics of each function and resulting closure:
+
+```{r}
+result1 <- 
+tibble::tibble(
+  
+  f = names(fs),
+  
+  # Size of function
+  fsize = map_dbl(fs, ~ pryr::object_size(.x)),
+  
+  # Size of closure
+  csize = map_dbl(fs, ~ pryr::object_size(.x(m1))),
+  
+  # what happens if called again?
+  csize2 = map_dbl(fs, ~ pryr::object_size(.x(m1))),
+  
+  # Size of result information
+  rsize = map_dbl(fs, ~ pryr::object_size(.x(m1)())),
+  
+  # Cost of information
+  loss = rsize/csize,
+    
+  # Size on disk
+  dsize = map_dbl(
+    .x = fs,
+    .f = ~ {
+      tmp <- tempfile()
+      saveRDS(.x(m1), file = tmp)
+      file.size(tmp)
+    }
+  )
+)
+```
+
+And what happens after adding more objects to the Global environment:
+
+```{r}
+m3 <- glm(mpg ~ 1, data = mtcars)
+m4 <- glm(weight ~ 1, data = ChickWeight)
+
+result2 <- 
+tibble::tibble(
+  
+  f = names(fs),
+  
+  # Size of function
+  fsize_2 = map_dbl(fs, ~ pryr::object_size(.x)),
+  
+  # Size of storage
+  csize_2 = map_dbl(fs, ~ pryr::object_size(.x(m1))),
+  
+  # size increases when called again!
+  csize2_2 = map_dbl(fs, ~ pryr::object_size(.x(m1))),
+  
+  # Size of result information
+  rsize_2 = map_dbl(fs, ~ pryr::object_size(.x(m1)())),
+  
+  # Cost of information
+  loss_ = rsize_2/csize_2,
+  
+  # Size on disk
+  dsize_2 = map_dbl(
+    .x = fs,
+    .f = ~ {
+      tmp <- tempfile()
+      saveRDS(.x(m1), file = tmp)
+      file.size(tmp)
+    }
+  )
+)
+```
+
+Now what happens if we remove the model objects and try to evaluate the closure created by each `f` on `m1`:
+
+```{r}
+gs <- map(
+  .x = fs,
+  .f = ~ .x(m1)
+)
+
+rm(m1, m2, m3, m4)
+
+result3 <- 
+tibble::tibble(
+  
+  f = names(gs),
+  
+  # Does it even work?
+  error = map_lgl(gs, ~ is.null(safely(.x)()$result)),
+  
+  # Size of storage
+  csize_3 = map_dbl(gs, ~ pryr::object_size(.x)),
+  
+  # Size on disk
+  dsize_3 = map_dbl(
+    .x = gs,
+    .f = ~ {
+      tmp <- tempfile()
+      saveRDS(.x, file = tmp)
+      file.size(tmp)
+    }
+  )
+)
+```
+
+Now let's look at the results:
+
+```{r, echo= FALSE}
+reduce(list(result1,result2, result3), ~ dplyr::left_join(.x, .y, by = "f")) %>%
+  knitr::kable(digits = 2)
+```
+
+# Comments
+
+* It's surprising (to me) how much variation there is in (memory) performance in these options.
+* `f0` is out as a candidate since it is not guaranteed to work when retrieved from disk.
+* My choice would be `f2` or `f8` which kind of converse of each other. `f2` states what information to throw out; `f8` states what information to keep.
+* I have not figured out what the size of all closures except `g8` increases after calling it for the first time. I've seen the opposite too. At work, I had a closure that reduced over 10x in size just by calling it once. I spent hours trying to figure out why.
+* It can be useful to keep the extra information around for debugging. A simple way to do this is to make clean up in `f2` optional like:
+
+```{r}
+f2_ <- function(model, cleanup = TRUE){
+  fm <- formula(model)
+  if (cleanup){ on.exit({ rm(model) }) }
+  function() { fm }
+}
+```
+
+Another option is cleaning up the environment by name.
+
+```{r}
+f2__ <- function(model){
+  inputs <- names(as.list(match.call())[-1])
+  fm <- formula(model)
+  on.exit({ rm(list = ls()[ls() %in% inputs]) })
+  function(){ fm }
+}
+```
