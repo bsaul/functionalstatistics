@@ -17,6 +17,7 @@ See my [google scholar profile](https://scholar.google.com/citations?user=7rYgr1
 * Ecology
 * Conservation
 * Research software design and engineering
+* Applied Category Theory
 
 # Eduation
 
