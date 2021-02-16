@@ -1,0 +1,229 @@
+---
+title: "Permutation Weighting for Estimating Marginal Structural Model Parameters"
+author: "Bradley Saul"
+date: 2021-02-16T09:19:14-05:00
+bibliography: post.bib
+#categories: ["causal"]
+tags: ["causal inference", "permutation weighting", "marginal structural models"]
+editor_options: 
+  chunk_output_type: console
+---
+
+<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
+
+
+<p>A few weeks ago, I demonstrated how permutation weighting <span class="citation">(<a href="#ref-arbour2020permutation" role="doc-biblioref">Arbour, Dimmery, and Sondhi 2020</a>)</span> can be used to <a href="posts/2021-01-19-permutation-weighting-causal/">estimate causal parameters under interference</a>. Today, I show how to use the same idea to estimate parameters in a longitudinal marginal structural model (MSM) <span class="citation">(<a href="#ref-robins1999marginal" role="doc-biblioref">Robins 1999</a>; <a href="#ref-robins2000marginal" role="doc-biblioref">Robins, Hernán, and Brumback 2000</a>)</span>. This post is mostly me proving to myself that it works when combining interference with longitudinal data in a MSM.</p>
+<p>I’m not going to go in depth on the theory or purpose of MSMs here. But briefly, MSMs have traditionally been applied in a longitudinal data context. The analyst supposes a parametric relationship between average potential outcomes; for example, a simple MSM for a continuous potential outcome <span class="math inline">\(Y(\cdot)\)</span> under an intervention from two previous timepoints is:</p>
+<p><span class="math inline">\(E[Y(a_1, a_2)] = \beta_0 + \beta_1 a_1 + \beta_2 a_2\)</span></p>
+<p>Under standard causal assumptions (such as no unnmeasured confounding), the <span class="math inline">\(\beta\)</span>s have a causal interpretation and can be estimated from the model using (stabilized) inverse probability weights taken over a subject’s history. The weights we’re trying to estimate are analogous to equation (2) in <span class="citation"><a href="#ref-arbour2020permutation" role="doc-biblioref">Arbour, Dimmery, and Sondhi</a> (<a href="#ref-arbour2020permutation" role="doc-biblioref">2020</a>)</span> with the difference that we need to maintain the clustered nature (within an individual) of treatments rather then permuting all the rows independently.</p>
+<div id="simulation-study" class="section level2">
+<h2>Simulation Study</h2>
+<blockquote>
+<p>I’m hiding the simulator functions, as the code is kludgy, similar to the <a href="posts/2021-01-19-permutation-weighting-causal/">2020-01-19 post</a>, and not the point, but you can find the source <code>.Rmd</code> on <a href="https://github.com/bsaul/functionalstatistics/tree/main/content/posts">github</a>.</p>
+</blockquote>
+<p>To make things interesting, the simulation simply extends the <a href="posts/2021-01-19-permutation-weighting-causal/">interference simulation</a> by adding additional timepoints for each subject. The outcomes can depend on the unit’s exposure (and that of neighbors) from the current and previous timepoint, as well as the outcome from the previous timepoint. To get time-varying confounding, a unit’s exposure also depends on the previous exposure.</p>
+</div>
+<div id="generic-permutation-weighting-functions" class="section level2">
+<h2>Generic Permutation Weighting Functions</h2>
+<pre class="r"><code>#&#39; Stack the observed data with the permuted data
+#&#39; @export
+permute_and_stack &lt;- function(dt, permuter){
+  dplyr::bind_rows(
+    dplyr::mutate(dt,  C = 0),
+    dplyr::mutate(permuter(dt), C = 1)
+  ) 
+}
+
+#&#39; Estimate the density ratio by modeling whether an observation is from 
+#&#39; the permuted dataset or original dataset
+.pw &lt;- function(dt, rhs_formula, fitter, modify_C, predictor, fitter_args, permuter){
+  pdt &lt;- permute_and_stack(dt, permuter)
+  pdt$C &lt;- modify_C(pdt$C)
+  m  &lt;- do.call(
+    fitter,
+    args = c(list(formula = update(C ~ 1, rhs_formula), data = pdt), fitter_args))
+  
+  w  &lt;- predictor(object = m, newdata = dt) 
+  w/(1 - w)
+}
+
+#&#39; Estimate permutation weights B times and average the results
+#&#39; @export
+get_permutation_weights &lt;- function(dt, B, rhs_formula, fitter, modify_C = identity, 
+                                    predictor, fitter_args = list(),
+                                    permuter){
+  out &lt;- replicate(
+    n    = B,
+    expr = .pw(dt, rhs_formula = rhs_formula, fitter = fitter, modify_C = modify_C,
+               predictor = predictor, fitter_args = fitter_args,
+               permuter = permuter)
+  )
+  
+  apply(out, 1, mean)
+}
+
+#&#39; Create a permutation weighted estimator for the marginal structural model
+#&#39; @export
+make_pw_estimator &lt;- function(fitter, rhs_formula, B, 
+                              modify_C = identity,
+                              predictor = function(object, newdata) {
+                                predict(object = object, newdata = newdata, type = &quot;response&quot;) 
+                              },
+                              fitter_args = list(),
+                              permuter){
+  function(data){
+    
+    w &lt;- get_permutation_weights(
+      dt = data, B = B, rhs_formula = rhs_formula, fitter  = fitter,
+      modify_C = modify_C, predictor = predictor, fitter_args = fitter_args,
+      permuter = permuter
+    )
+    
+    w
+  }
+}</code></pre>
+</div>
+<div id="specific-pw-functions" class="section level2">
+<h2>Specific PW functions</h2>
+<p>These functions are specific for analyzing the data simulated for this post. Note that the permuting function permutes entire vectors of treatment. Also the binary classifier used in the permutation weighting estimator uses a GEE model.</p>
+<pre class="r"><code># Half ass permutation attempt with several poor practices
+# * number of timepoints is hardcoded!
+# * number of timepoints is same for all subjects
+# * object `edges` will need to be found in an another environment (i.e. Global)
+permuterf &lt;- function(dt){
+  dt &lt;- dplyr::arrange(dt, id, t)
+  rl &lt;- rle(dt$id)
+  permutation &lt;- rep((sample(rl$values, replace = FALSE) - 1L) * 4L, each = 4L) + 1:4
+  dt %&gt;%
+    dplyr::mutate(
+      A = A[permutation]
+    ) %&gt;%
+    dplyr::group_by(t) %&gt;%
+    dplyr::mutate(
+      # Number of treated neighbors
+      A_n = as.numeric(edges %*% A),
+      # Proportion of neighbors treated
+      fA  = A_n/m_i,
+      id  = id + max(id)
+    ) %&gt;%
+    dplyr::ungroup() %&gt;%
+    dplyr::group_by(id) %&gt;%
+    dplyr::mutate(
+      Al  = dplyr::lag(A),
+      fAl = dplyr::lag(fA)
+    ) %&gt;%
+    dplyr::ungroup() 
+}
+
+gee_fitter &lt;- function(formula, data, ...){
+  data &lt;- dplyr::filter(data, t &gt; 0)
+  geepack::geeglm(formula = formula, data = data, id = id, family = binomial)
+}
+
+pdct &lt;- function(object, newdata) { 
+  predict(object = object, newdata = dplyr::filter(newdata, t &gt; 0), type = &quot;response&quot;)
+}</code></pre>
+<p>Here’s the estimator I’ll use:</p>
+<pre class="r"><code>pw_geeimator &lt;- make_pw_estimator(
+  gee_fitter,
+  B = 5,
+  rhs_formula = ~ ((A + fA + Al + fAl):(factor(t) + Z1_abs*Z2 + Z3 + Yl) +
+                  (factor(t) + Z1_abs*Z2 + Z3 + Yl)),
+  permuter = permuterf,
+  predictor = pdct)</code></pre>
+<pre class="r"><code># Fix an adjacency matrix for use across simulations
+# Set sample size to 5000
+edges &lt;- gen_edges(n = 5000, 5)
+
+sim_data &lt;- function(){
+   edges  %&gt;%
+   gen_data_0(
+        gamma = c(-2, 0.2, 0, 0.2, 0.2),
+        beta = c(2, 0, 0, -1.5, 2, -3, -3)
+    ) %&gt;%
+    purrr::reduce(
+      .x = 1:3, # 3 timepoints after time 0
+      .f = ~ gen_data_t(.x, .y,           
+                        gamma = c(-2, 3, 0, 0.2, 0, 0.2, 0.2),
+                        beta  = c(2, 0, 0, 0, -0.5, 0, -1.5, 2, -3, -3)),
+      .init = .
+    ) %&gt;%
+    purrr::pluck(&quot;data&quot;) %&gt;%
+    dplyr::arrange(id, t)
+}
+
+do_sim &lt;- function(){
+  dt &lt;- sim_data()
+  w  &lt;- pw_geeimator(dt)
+  dt &lt;- dt %&gt;% dplyr::filter(t &gt; 0) %&gt;% dplyr::mutate(w = w)
+  
+  res_w &lt;- geepack::geeglm(
+    Y ~ -1 + factor(t) + A + Al + fA + fAl, data = dt, id = id, weights = dt$w
+  )
+  
+  res_naive &lt;- geepack::geeglm(
+    Y ~ -1 + factor(t) + A + Al + fA + fAl, data = dt, id = id
+  )
+  
+  
+  bind_rows(
+    broom::tidy(res_naive) %&gt;% dplyr::mutate(estimator = &quot;naive&quot;),
+    broom::tidy(res_w) %&gt;% dplyr::mutate(estimator = &quot;pw_weighted&quot;)
+  )
+  
+}</code></pre>
+<p>In the <code>sim_data</code> function, I set the parameters so that the only non-null effect is the exposure of neighbors from the previous timepoint.</p>
+</div>
+<div id="results" class="section level1">
+<h1>Results</h1>
+<p>The plot below shows the bias from 100 simulations for the 4 causal parameters from a naive (unweighted) GEE model and the permutation weighted version.</p>
+<pre class="r"><code>library(dplyr)
+## 
+## Attaching package: &#39;dplyr&#39;
+## The following objects are masked from &#39;package:stats&#39;:
+## 
+##     filter, lag
+## The following objects are masked from &#39;package:base&#39;:
+## 
+##     intersect, setdiff, setequal, union
+library(geepack)
+library(ggplot2)
+
+res &lt;-
+  purrr::map_dfr(1:100, ~ do_sim(), .id = &quot;simid&quot;) %&gt;%
+  filter(grepl(&quot;A&quot;, term)) %&gt;%
+  group_by(simid) %&gt;%
+  mutate(
+    bias = estimate - c(0, 0, 0, -0.5)
+  )
+  
+ggplot(
+  data = res,
+  aes(x = estimator, y = bias)
+) +
+  geom_hline(yintercept = 0) +
+  geom_jitter() +
+  facet_grid(~ term)</code></pre>
+<p><img src="{{< blogdown/postref >}}index_files/figure-html/unnamed-chunk-6-1.png" width="672" /></p>
+</div>
+<div id="summary" class="section level1">
+<h1>Summary</h1>
+<ul>
+<li>Even after adding a time element to <a href="posts/2021-01-19-permutation-weighting-causal/">interference simulation</a> from the other day, permutation weighting still works. I’m not surprised.</li>
+<li>The estimate for the non-null <code>fAl</code> appears downwardly biased a bit. I’ll want to look into that further, but in general permutation weighting seems like a promising approach.</li>
+</ul>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references csl-bib-body hanging-indent">
+<div id="ref-arbour2020permutation" class="csl-entry">
+Arbour, David, Drew Dimmery, and Arjun Sondhi. 2020. <span>“Permutation Weighting.”</span> <em>arXiv Preprint</em>.
+</div>
+<div id="ref-robins1999marginal" class="csl-entry">
+Robins, James M. 1999. <span>“Marginal Structural Models Versus Structural Nested Models as Tools for Causal Inference.”</span> In <em>Statistical Models in Epidemiology: The Environment and Clinical Trials</em>, edited by M. Elizabeth Halloran and D Berry. Springer-Verlag.
+</div>
+<div id="ref-robins2000marginal" class="csl-entry">
+Robins, James M., Miguel A. Hernán, and Babette Brumback. 2000. <span>“Marginal Structural Models and Causal Inference in Epidemiology.”</span> <em>Epidemiology</em>.
+</div>
+</div>
+</div>
