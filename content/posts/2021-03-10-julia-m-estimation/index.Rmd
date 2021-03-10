@@ -1,0 +1,122 @@
+---
+title: "M-estimation in Julia"
+author: "Bradley Saul"
+date: 2021-03-10T14:19:14-05:00
+#categories: ["causal"]
+tags: ["Julia", "R", "statistics", "m-estimation"]
+editor_options: 
+  chunk_output_type: console
+---
+
+A goal of mine is to get up to speed with [Catlab.jl](https://github.com/AlgebraicJulia/Catlab.jl), a [Julia](https://julialang.org/) library for doing applied Category Theory. Since it's written in Julia, I spent a bit of time getting hands-on Julia experience by toying around with something I know: [M-estimation](https://en.wikipedia.org/wiki/M-estimator).
+
+In this post, I code a stripped down Julia version of [`geex`](https://bsaul.github.io/geex/), an R package I created to give developers a straightforward way to create new M-estimators. This Julia code (nor `geex` for that matter) is not designed be to computationally optimized. It is designed so that programmers write a single function, corresponding to $\psi$ for their ["$\psi$-type"](https://en.wikipedia.org/wiki/M-estimator#%CF%88-type) M-estimator; i.e. the solutions to a set of estimating equations:
+
+\(
+\sum_i \psi_i(\theta) =  \sum_i \psi(O_i; \theta) = 0
+\)
+
+My hope is that `geex` makes statisticians lives easier, and they can skip the tedious task of programming M-estimators (particularly variance estimators) by hand.
+
+My attempt at implementing a version of `geex` in Julia is: 
+
+```{julia, eval = FALSE}
+using ForwardDiff, 
+      IntervalRootFinding,
+      IntervalArithmetic, 
+      StaticArrays
+
+make_m_estimator(f) =
+    function(data::Array{Float64, 1} ; rootBox)
+        ψs = map(f, data)
+        crush(g) = mapreduce(g, +, ψs)
+        ψ(θ) = crush(ψᵢ -> ψᵢ(θ))
+        A(θ) = crush(ψᵢ -> - ForwardDiff.jacobian(ψᵢ, θ))
+        B(θ) = crush(ψᵢ -> ψᵢ(θ) .* ψᵢ(θ)')
+        Σ(θ) = inv(A(θ)) * B(θ) * inv(A(θ))'
+
+        θhat = mid.(interval.(roots(ψ, rootBox)))[1]
+        Σhat = Σ(θhat)
+
+        return (θhat, Σhat)
+    end
+```
+
+That's it. First of all, this version is less general than `geex` as the estimating functions only takes a 1D array of floats as data. Essentially, this limits the application to univariate data where each element of the input is a "unit". To be useful in practice, it would need to handle multivariate data where the size of the units may be uneven. Nonetheless, the core ideas are there.
+
+To use `make_m_estimator`, you supply a function. In this case, I'm replicating [example 3 in the `geex` documentation](https://bsaul.github.io/geex/articles/v00_geex_intro.html).  
+
+```{julia, eval=FALSE}
+myψ = x::Number -> 
+    ( (μ, σ², σ, lσ² ), ) ->
+    SVector( x - μ, 
+            (x - μ)^2 - σ², 
+            sqrt(σ²) - σ,
+            log(σ²) - lσ²)
+
+m = make_m_estimator(myψ)
+```
+
+Then to get estimates of $\theta$ and its variance:
+
+```{julia, eval=FALSE}
+z = rand(1000)
+Xμ = -1..1
+Xσ = 0.001..0.25
+r = m(z; rootBox = Xμ × Xσ × sqrt(Xσ) × log(Xσ))
+```
+
+The value of `r[1]` is:
+```
+[0.5144286972530171, 0.08643690499929671, 0.2940015391104215, -2.448340553175395]
+```
+
+and 
+
+```
+using Statistics
+(mean(z), var(z), sqrt(var(z)), log(var(z))) =
+(0.5144286972530172, 0.08652342842772438, 0.29414865022250974, -2.447340052841812)
+```
+
+So you can see the approximations are pretty good for this example.
+
+# Comparison to `geex`
+
+There a couple implementation details worth noting:
+
+1. The root finding algorithm in the `Julia` version use [`IntervalRootFinding.jl`](https://juliaintervals.github.io/IntervalRootFinding.jl/stable/)'s `roots` function; while `geex` (by default - the user can specify a root finding function) uses the [`rootSolve::multiroot`](https://cran.r-project.org/web/packages/rootSolve/rootSolve.pdf) function. I don't know enough about the algorithms behind the functions to say much, but I'd like to understand the details and performance characteristics better.
+2. To find the derivative of $\psi$, `geex` uses `numDeriv::jacobian` (again, by default) to *numerically* find the derivatives; while in the Julia version uses [automatic differentiation](https://en.wikipedia.org/wiki/Automatic_differentiation) via the `ForwardDiff.jl` package.
+
+These details are mostly hidden from the user, however, and the actual interface is quite similar (minus the cool factor of being able to use unicode characters in Julia):
+
+```{r, message=FALSE}
+library(geex)
+
+mypsi <- function(data){
+  x <- data$x
+  function(theta){
+      c(x - theta[1],
+       (x - theta[1])^2 - theta[2],
+       sqrt(theta[2]) - theta[3],
+       log(theta[2]) - theta[4])
+  }
+}
+```
+
+To put `mypsi` in action:
+
+```{r}
+dt <- data.frame(id = 1:1000, x = rnorm(1000))
+r <- m_estimate(estFUN = mypsi, 
+               data = dt,
+               units = "id",
+               root_control = setup_root_control(start = c(0, 1, 1, 0)))
+coef(r)
+```
+
+# Summary
+
+* I was able to get and up and going with Julia rather quickly. Overall, my experience was good. 
+* In the future I hope to look ways of computationally optimizing the approach to M-estimation implemented above. Julia has a reputation for being fast, so perhaps I may dig around in the Julia ecosystem further...
+* ...it looks like there already is an [`MEstimation.jl`](https://ikosmidis.github.io/MEstimation.jl/dev/) package. Definitely seems worth checking out!
