@@ -11,8 +11,8 @@ editor_options:
 <script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
 
 
-<p>A goal of mine is to get up to speed with <a href="https://github.com/AlgebraicJulia/Catlab.jl">Catlab.jl</a>, a <a href="https://julialang.org/">Julia</a> library for doing applied Category Theory. Since it’s written in Julia, I spent the last couple of days getting some hands-on Julia experience by toying around with something I know: <a href="https://en.wikipedia.org/wiki/M-estimator">M-estimation</a>.</p>
-<p>In this post, I code a stripped down Julia version of <a href="https://bsaul.github.io/geex/"><code>geex</code></a>, an R package I created to give developers a straightforward way to create new M-estimators. This Julia code (nor <code>geex</code> for that matter) is not designed be to computationally optimized. It is designed so that programmers write a single function, corresponding to <span class="math inline">\(\psi\)</span> for their ]“<span class="math inline">\(\psi\)</span>-type”](<a href="https://en.wikipedia.org/wiki/M-estimator#%CF%88-type" class="uri">https://en.wikipedia.org/wiki/M-estimator#%CF%88-type</a>) M-estimator; i.e. the solutions to a set of estimating equations:</p>
+<p>A goal of mine is to get up to speed with <a href="https://github.com/AlgebraicJulia/Catlab.jl">Catlab.jl</a>, a <a href="https://julialang.org/">Julia</a> library for doing applied Category Theory. Since it’s written in Julia, I spent a bit of time getting hands-on Julia experience by toying around with something I know: <a href="https://en.wikipedia.org/wiki/M-estimator">M-estimation</a>.</p>
+<p>In this post, I code a stripped down Julia version of <a href="https://bsaul.github.io/geex/"><code>geex</code></a>, an R package I created to give developers a straightforward way to create new M-estimators. This Julia code (nor <code>geex</code> for that matter) is not designed be to computationally optimized. It is designed so that programmers write a single function, corresponding to <span class="math inline">\(\psi\)</span> for their <a href="https://en.wikipedia.org/wiki/M-estimator#%CF%88-type">“<span class="math inline">\(\psi\)</span>-type”</a> M-estimator; i.e. the solutions to a set of estimating equations:</p>
 <p><span class="math inline">\(\sum_i \psi_i(\theta) = \sum_i \psi(O_i; \theta) = 0\)</span></p>
 <p>My hope is that <code>geex</code> makes statisticians lives easier, and they can skip the tedious task of programming M-estimators (particularly variance estimators) by hand.</p>
 <p>My attempt at implementing a version of <code>geex</code> in Julia is:</p>
@@ -35,7 +35,7 @@ make_m_estimator(f) =
 
         return (θhat, Σhat)
     end</code></pre>
-<p>First of all, this version is less general than <code>geex</code> as the estimating functions only takes a 1D array of floats as data. Essentially, this limits the application to univariate data where each element of the input is a “unit”. To be useful in practice, it would need to handle multivariate data where the size of the units may be uneven. Nonetheless, the core ideas are there.</p>
+<p>That’s it. First of all, this version is less general than <code>geex</code> as the estimating functions only takes a 1D array of floats as data. Essentially, this limits the application to univariate data where each element of the input is a “unit”. To be useful in practice, it would need to handle multivariate data where the size of the units may be uneven. Nonetheless, the core ideas are there.</p>
 <p>To use <code>make_m_estimator</code>, you supply a function. In this case, I’m replicating <a href="https://bsaul.github.io/geex/articles/v00_geex_intro.html">example 3 in the <code>geex</code> documentation</a>.</p>
 <pre class="julia"><code>myψ = x::Number -&gt; 
     ( (μ, σ², σ, lσ² ), ) -&gt;
@@ -83,13 +83,13 @@ r &lt;- m_estimate(estFUN = mypsi,
                units = &quot;id&quot;,
                root_control = setup_root_control(start = c(0, 1, 1, 0)))
 coef(r)</code></pre>
-<pre><code>## [1] -0.02346305  0.98473378  0.99233753 -0.01538395</code></pre>
+<pre><code>## [1] 0.003024682 1.053540090 1.026421010 0.052156008</code></pre>
 </div>
 <div id="summary" class="section level1">
 <h1>Summary</h1>
 <ul>
-<li>I was able to get and up and going with Julia rather quickly. And overall, my experience was good.</li>
-<li>In the future I hope to look ways of optimizing the approach to M-estimation implemented above. Julia has a reputation for being fast, so perhaps I may dig around in the Julia ecosystem further…</li>
+<li>I was able to get and up and going with Julia rather quickly. Overall, my experience was good.</li>
+<li>In the future I hope to look ways of computationally optimizing the approach to M-estimation implemented above. Julia has a reputation for being fast, so perhaps I may dig around in the Julia ecosystem further…</li>
 <li>…it looks like there already is an <a href="https://ikosmidis.github.io/MEstimation.jl/dev/"><code>MEstimation.jl</code></a> package. Definitely seems worth checking out!</li>
 </ul>
 </div>
