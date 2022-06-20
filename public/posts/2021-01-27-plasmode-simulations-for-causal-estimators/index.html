@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Language" content="en">
+
+    <meta name="author" content="Bradley Saul">
+    <meta name="description" content="Most statistical methods papers include simulations to check the operating characteristics of the proposed methods. Data generating mechanisms for these simulations are often contrived as mixtures from known parametric distributions. While these simulators do the job, in this post, I demonstrate a simulation technique designed to increase the versimilitude to the study data actually collected. I’ve used this approach in the past, but only recently learned a name for it: plasmode simulation.">
+    <meta name="keywords" content="blog,developer,statistian">
+
+    <meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Creating a Plasmode Simulator for Comparing Causal Estimators with Spatial Interference"/>
+<meta name="twitter:description" content="Most statistical methods papers include simulations to check the operating characteristics of the proposed methods. Data generating mechanisms for these simulations are often contrived as mixtures from known parametric distributions. While these simulators do the job, in this post, I demonstrate a simulation technique designed to increase the versimilitude to the study data actually collected. I’ve used this approach in the past, but only recently learned a name for it: plasmode simulation."/>
+
+    <meta property="og:title" content="Creating a Plasmode Simulator for Comparing Causal Estimators with Spatial Interference" />
+<meta property="og:description" content="Most statistical methods papers include simulations to check the operating characteristics of the proposed methods. Data generating mechanisms for these simulations are often contrived as mixtures from known parametric distributions. While these simulators do the job, in this post, I demonstrate a simulation technique designed to increase the versimilitude to the study data actually collected. I’ve used this approach in the past, but only recently learned a name for it: plasmode simulation." />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="http://www.functionalstatistics.com/posts/2021-01-27-plasmode-simulations-for-causal-estimators/" /><meta property="article:section" content="posts" />
+<meta property="article:published_time" content="2021-01-27T09:19:14-05:00" />
+<meta property="article:modified_time" content="2021-01-27T09:19:14-05:00" />
+
+
+
+    <title>
+  Creating a Plasmode Simulator for Comparing Causal Estimators with Spatial Interference · Functional Statistics
+</title>
+
+    
+      <link rel="canonical" href="http://www.functionalstatistics.com/posts/2021-01-27-plasmode-simulations-for-causal-estimators/">
+    
+
+    <link rel="preconnect" href="https://fonts.gstatic.com">
+    <link href="https://fonts.googleapis.com/css?family=Lato:400,700%7CMerriweather:300,700%7CSource+Code+Pro:400,700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/fork-awesome@1.1.7/css/fork-awesome.min.css"
+      integrity="sha256-gsmEoJAws/Kd3CjuOQzLie5Q3yshhvmo7YNtBG7aaEY=" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/normalize.css@8/normalize.min.css">
+    
+      
+      
+      <link rel="stylesheet" href="/css/coder.min.bd0bf389ec7105ff6f844bf651ac39b66286897c63ea13a62a83578895f4d4d6.css" integrity="sha256-vQvziexxBf9vhEv2Uaw5tmKGiXxj6hOmKoNXiJX01NY=" crossorigin="anonymous" media="screen" />
+    
+
+    
+
+    
+      
+        
+        
+        <link rel="stylesheet" href="/css/coder-dark.min.1dcbd3298d9223b92734c6cab3404869e25dd66d3131e18ba4c9a0358e9a26ba.css" integrity="sha256-HcvTKY2SI7knNMbKs0BIaeJd1m0xMeGLpMmgNY6aJro=" crossorigin="anonymous" media="screen" />
+      
+    
+
+    
+
+    
+
+    <link rel="icon" type="image/png" href="/images/favicon-32x32.png" sizes="32x32">
+    <link rel="icon" type="image/png" href="/images/favicon-16x16.png" sizes="16x16">
+
+    <link rel="apple-touch-icon" href="/images/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/apple-touch-icon.png">
+
+    
+      <script defer src="https://twemoji.maxcdn.com/v/13.0.1/twemoji.min.js"
+        integrity="sha384-5f4X0lBluNY/Ib4VhGx0Pf6iDCF99VGXJIyYy7dDLY5QlEd7Ap0hICSSZA1XYbc4" crossorigin="anonymous"></script>
+    
+
+    <meta name="generator" content="Hugo 0.101.0" />
+  </head>
+
+  
+  
+    
+  
+  <body class="colorscheme-auto"
+        onload=" twemoji.parse(document.body); "
+  >
+    
+<div class="float-container">
+    <a id="dark-mode-toggle" class="colorscheme-toggle">
+        <i class="fa fa-adjust fa-fw" aria-hidden="true"></i>
+    </a>
+</div>
+
+
+    <main class="wrapper">
+      <nav class="navigation">
+  <section class="container">
+    <a class="navigation-title" href="/">
+      Functional Statistics
+    </a>
+    
+      <input type="checkbox" id="menu-toggle" />
+      <label class="menu-button float-right" for="menu-toggle">
+        <i class="fa fa-bars fa-fw" aria-hidden="true"></i>
+      </label>
+      <ul class="navigation-list">
+        
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="/about/">About</a>
+            </li>
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="/posts/">Blog</a>
+            </li>
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="/software/">Software</a>
+            </li>
+          
+            <li class="navigation-item">
+              <a class="navigation-link" href="/contact/">Contact me</a>
+            </li>
+          
+        
+        
+      </ul>
+    
+  </section>
+</nav>
+
+
+
+<link href='//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/styles/xcode.min.css' rel='stylesheet' type='text/css' />
+
+
+
+
+      <div class="content">
+        
+  <section class="container post">
+    <article>
+      <header>
+        <div class="post-title">
+          <h1 class="title">Creating a Plasmode Simulator for Comparing Causal Estimators with Spatial Interference</h1>
+        </div>
+        <div class="post-meta">
+          <div class="date">
+            <span class="posted-on">
+              <i class="fa fa-calendar" aria-hidden="true"></i>
+              <time datetime='2021-01-27T09:19:14-05:00'>
+                January 27, 2021
+              </time>
+            </span>
+            <span class="reading-time">
+              <i class="fa fa-clock-o" aria-hidden="true"></i>
+              10-minute read
+            </span>
+          </div>
+          
+          
+          <div class="tags">
+  <i class="fa fa-tag" aria-hidden="true"></i>
+    <a href="/tags/causal-inference/">causal inference</a>
+      <span class="separator">•</span>
+    <a href="/tags/plasmode/">plasmode</a>
+      <span class="separator">•</span>
+    <a href="/tags/simulation/">simulation</a>
+      <span class="separator">•</span>
+    <a href="/tags/interference/">interference</a>
+      <span class="separator">•</span>
+    <a href="/tags/r/">R</a></div>
+
+        </div>
+      </header>
+
+      <div>
+        
+        
+<script src="http://www.functionalstatistics.com/posts/2021-01-27-plasmode-simulations-for-causal-estimators/index_files/header-attrs/header-attrs.js"></script>
+
+
+<p>Most statistical methods papers include simulations to check the operating characteristics of the proposed methods. Data generating mechanisms for these simulations are often contrived as mixtures from known parametric distributions. While these simulators do the job, in this post, I demonstrate a simulation technique designed to increase the versimilitude to the study data actually collected. I’ve used this approach in the past, but only recently learned a name for it: plasmode simulation.</p>
+<p>As best I can tell, <span class="citation">Cattell and Jaspers (<a href="#ref-cattell1967general" role="doc-biblioref">1967</a>)</span> coined the term:</p>
+<blockquote>
+<p>A plasmode is defined as a set fo numerical value fitting a mathematic-theoretical model. That it fits the model may be know either because simulated data is produced mathematically to fit the functions, or because we have a real–usually mechanical–situation which we know with certainy produce data of that kind.</p>
+</blockquote>
+<p>I don’t have the full paper, so I’m curious why they choose the word <em>plasmode</em>. My guess is the etymology is related to the Latin root meaning to form or mold, but the <a href="https://www.oed.com/view/Entry/236355?redirectedFrom=plasmode#eid">OED entry for plasmode</a> labels <em>plasmode</em> as a variant of <em>plasmodium</em>, the genus of unicelluar eukaryotes. Whatever the reason, the label seems to be <a href="https://scholar.google.com/scholar?hl=en&amp;as_sdt=0,34&amp;q=plasmode">gaining traction</a> in the scientific literature.</p>
+<p>In this post, I walk through my process for creating a simulator that I will use to benchmark estimators of causal effects under <a href="@hudgens2008towards">interference</a> for an analysis I’m working on. In my <a href="posts/2021-01-19-permutation-weighting-causal/">last post</a>, I gave an example of one of the estimators I plan to examine using an artificial simulation.</p>
+<div id="motivation" class="section level1">
+<h1>Motivation</h1>
+<p>I’m working on a <a href="https://github.com/bsaul/conservation_spillover">project</a> to estimate causal effects of parcel-level land conservation policies on land change outcomes <span class="citation">(the data comes from Nolte et al. <a href="#ref-nolte2019voluntary" role="doc-biblioref">2019</a>)</span>. Interference arises here because it is certainly plausible, for example, that a parcel’s conservation easement may affect development on neighboring parcels. I hope to develop (or use existing) estimators that can handle the spatial structure of this interference. Spatial interference has been getting more attention recently (see, e.g., <span class="citation">Verbitsky-Savitz and Raudenbush (<a href="#ref-verbitsky-savitz2012causal" role="doc-biblioref">2012</a>)</span>, <span class="citation">Osama, Zachariah, and Schön (<a href="#ref-osama2019inferring" role="doc-biblioref">2019</a>)</span>, <span class="citation">Reich et al. (<a href="#ref-reich2020a-review" role="doc-biblioref">2020</a>)</span>, <span class="citation">Giffin et al. (<a href="#ref-giffin2020generalized" role="doc-biblioref">2020</a>)</span>). This project continues this line of research, and for the project I want to benchmark the estimators using data that resembles the actual data collected by <span class="citation">Nolte et al. (<a href="#ref-nolte2019voluntary" role="doc-biblioref">2019</a>)</span>.</p>
+</div>
+<div id="simulation-framework" class="section level1">
+<h1>Simulation Framework</h1>
+<p>The basic approach is this:</p>
+<ol style="list-style-type: decimal">
+<li>Create the analytic dataset.</li>
+<li>Fit somewhat complicated but <em>parametric</em> model (such as a Generalized Additive Model <span class="citation">(Wood <a href="#ref-wood2017gam" role="doc-biblioref">2017</a>)</span>) for both exposure assignment and the outcome in such a way that you can twiddle with parameters from the fitted models and produce simulated data from your hypothesized causal model. In my case, my assumed model is a marginal structural model:</li>
+</ol>
+<p><span class="math display">\[
+E[Y(a, \tilde{a})] = \theta_0 + \theta_1 a + \theta_2 f(\tilde{a})
+\]</span></p>
+<p>where <span class="math inline">\(Y(a, \tilde{a})\)</span> is the potential outcome given a parcel’s exposure <span class="math inline">\(a\)</span> and a function of the exposure of other parcels (<span class="math inline">\(\tilde{a}\)</span>).</p>
+<ol start="3" style="list-style-type: decimal">
+<li>Sample from the analytic dataset and pass covariates into the predictor functions from the fitted models in the last step to produce a simulated dataset.</li>
+<li>Repeat step 3 as desired for benchmarking and twiddling with parameter settings.</li>
+</ol>
+<p>Regarding step 3, <span class="citation">Franklin et al. (<a href="#ref-franklin2014plasmode" role="doc-biblioref">2014</a>)</span> sampled with replacement from the underlying dataset. Since I want to preserve the spatial structure of my data, I instead take a spatially balanced <span class="citation">(Robertson et al. <a href="#ref-robertson2013bas" role="doc-biblioref">2013</a>)</span> sample of parcel polygons then for each sampled parcel, I create a basis for a simulation from all the parcels intersecting or within a buffer around the sampled parcel. This will hopefully be more clear in the code below.</p>
+</div>
+<div id="code" class="section level1">
+<h1>Code</h1>
+<p>I present this code for demonstration, but hopefully there are helpful tidbits. Like many analyses, the code is mostly idiosyncratic to the analysis. The code for creating the analysis dataset can be found in the <a href="https://github.com/bsaul/conservation_spillover">project’s github</a> repository.</p>
+<blockquote>
+<p>Note: The <code>basisdt</code> object is quite large, and I don’t want to store the file in git. Hence, I built this <code>.Rmd</code> locally and (for shame) hardcoding the file path. To actually run the code below, you’ll need to run the data processing scripts in <a href="https://github.com/bsaul/conservation_spillover">project’s github</a> <code>scripts</code> directory to create the <code>basisdt</code> object.</p>
+</blockquote>
+<div id="simulator-functions" class="section level2">
+<h2>Simulator functions</h2>
+<p>I’ve written two key functions: <code>create_model_simulator</code> and <code>create_simulator</code>. The <code>create_model_simulator</code> function fits a <code>gam</code> model and returns a function (technically a closure) which can take new data as well as update parameters. Out of laziness, I’m updating parameters based on names, but if I were shipping this function I would clean it up quite a bit.</p>
+<p>The <code>post</code> argument takes a function that can be used to modify the final output. I use this pattern a lot in my R programming: including an option to post (and/or pre) processing output (and/or input) from/to a function.</p>
+<pre class="r"><code>create_model_simulator &lt;- function(formula, data, family, post = identity){
+  m    &lt;- mgcv::gam(formula = formula, data = data, family = family)
+  fm   &lt;- formula(m)
+  beta &lt;- coef(m)
+  inv  &lt;- family()[[&quot;linkinv&quot;]]
+  function(newdata, newparms){
+    X &lt;- mgcv::gam(fm, data = newdata, family = family(), fit = FALSE)[[&quot;X&quot;]]
+    beta[names(newparms)] &lt;- newparms
+    post(inv(X %*% beta))
+  }
+}</code></pre>
+<p>Now I create simulator for the exposure and the outcome. The models are somewhat complicated in terms of the functional form of the predictors, but I don’t want a model <em>too</em> complicated with hundreds of parameters, as I prefer predictions to be computationally fast.</p>
+<pre class="r"><code># Prediction models for simulation
+exposure_simulator &lt;- 
+  create_model_simulator(
+    formula = A ~ log(ha)*slope + 
+      I(p_wet == 0) + p_wet + 
+      I(neighbor_p_wet == 0) + neighbor_p_wet + 
+      log1p(coast_2500) + travel +
+      s(log(ha)) +
+      s(slope) + 
+      s(p_wet) + 
+      s(travel),
+    data   = basisdt,
+    family = binomial,
+    # Generate 0/1 exposure
+    post   = function(x) { rbinom(length(x), size = 1, prob = x) }
+  )
+
+outcome_simulator &lt;- create_model_simulator(
+  formula = d_forested ~
+    A*A_tilde + 
+    log(ha)*slope +
+    I(p_wet == 0) + p_wet +
+    I(neighbor_p_wet == 0) + neighbor_p_wet + 
+    log1p(coast_2500) + travel +
+    s(log(ha)) +
+    s(slope) +
+    s(p_wet) +
+    s(travel),
+  data   = basisdt,
+  family = gaussian,
+  # inv(X %*% beta) returns a 1D matrix, but I need a vector so drop
+  post   = drop
+)</code></pre>
+<p>The <code>create_simulator</code> function take the two model simulators above to produce <code>function</code> that can a simulated dataset given covariate data and optionally new parameters. In my case, the function is more complicated than simply simulating the exposure and outcome. The <span class="math inline">\(f(\tilde{A})\)</span> term needs to be recomputed after the exposure is generated but before the outcome is generated. Here, <span class="math inline">\(f(\tilde{A})\)</span> is the proportion of a parcel’s boundary shared with treated parcels, thus in addition to covariates the basis data for a simulation needs to contain covariates plus parcel adjacency information (<code>neighbor_pids</code> in the code below).</p>
+<pre class="r"><code>create_simulator &lt;- function(exposure_sim, outcome_sim){
+  force(exposure_sim)
+  force(outcome_sim)
+  function(newdata, exposure_newparms = NULL, outcome_newparms = NULL){
+    df &lt;- newdata
+    df[[&quot;A&quot;]] &lt;- exposure_sim(df, exposure_newparms)
+    df %&gt;%
+      {
+        hold  &lt;- .
+        
+        dplyr::mutate(
+          hold,
+          # Update treatment of neighbors
+          tr_neighbors = purrr::map(
+            .x = neighbor_pids,
+            .f = ~ hold[[&quot;A&quot;]][hold[[&quot;pid&quot;]] %in% .x]
+          )
+        )
+      } %&gt;%
+      dplyr::mutate(
+        # Proportion of boundary shared with treated units
+        A_tilde = purrr::map2_dbl(
+          .x = tr_neighbors,
+          .y = neighbor_boundary_lengths,
+          .f = function(x, y){
+            `if`(length(x) == 0 || sum(as.numeric(y)) == 0, 
+                 0, sum(x * y)/sum(y))
+          })
+      ) -&gt;
+      df
+    df[[&quot;Y&quot;]] &lt;- outcome_sim(df, outcome_newparms)
+    
+    df
+  }
+}</code></pre>
+<p>Now I can create my simulator:</p>
+<pre class="r"><code>simulator1 &lt;- create_simulator(exposure_simulator, outcome_simulator)</code></pre>
+<p>An advantage of having <code>create_simulator</code> return a closure is that I can save this
+closure to disk for use later within needing to refit models and reload large datasets.</p>
+</div>
+<div id="sampling" class="section level2">
+<h2>Sampling</h2>
+<p>I sample 3000 parcels. I may not need all these in the end, but better to sample extra now than need to go back later.</p>
+<pre class="r"><code>frame &lt;- sf::as_Spatial(sf::st_cast(basisdt$geometry, &quot;POLYGON&quot;))
+smpl  &lt;- SDraw::sdraw(frame, n = 3000, type = &quot;BAS&quot;)
+ids   &lt;- basisdt$pid[as.integer(gsub(&quot;ID&quot;, &quot;&quot;, smpl$geometryID))]</code></pre>
+<p>The sample indeed looks like Massachusetts:</p>
+<pre class="r"><code>plot(basisdt$geometry[basisdt$pid %in% ids])</code></pre>
+<p><img src="http://www.functionalstatistics.com/posts/2021-01-27-plasmode-simulations-for-causal-estimators/index_files/figure-html/unnamed-chunk-7-1.png" width="672" /></p>
+</div>
+<div id="usage" class="section level2">
+<h2>Usage</h2>
+<p>Now that I have “seed” parcels, I create simulated datasets by drawing a circle around a sampled parcel and taking all the parcels that are within or intersect the buffer. Creating the basis for a simulation requires an extra step here because the neighbors need to be updated after the sample is taken since all of a parcel’s neighbors may not be in the sample (at the edges, for example).</p>
+<pre class="r"><code>create_sim_basisdata &lt;- function(seed_id, km_buffer){
+  # This depends on having basisdt in the search path (e.g. Global Environment)!
+  loc &lt;- sf::st_buffer(basisdt$geometry[basisdt$pid == seed_id, &quot;geometry&quot;], 
+                       units::as_units(km_buffer, &quot;km&quot;))
+  prd &lt;- 
+    drop(sf::st_intersects(basisdt$geometry, loc, sparse = FALSE)) |
+    drop(sf::st_within(basisdt$geometry, loc, sparse = FALSE)) 
+  
+  basisdt[prd, ] %&gt;% 
+    {
+      hold &lt;- .
+      hold %&gt;%
+        dplyr::mutate(
+          neighbors_pids = purrr::map(
+            .x = neighbor_pids,
+            .f = ~ which(hold$pid %in% .x)
+          ),
+          neighbors = purrr::map(
+            .x = neighbor_pids,
+            .f = ~ which(hold$pid %in% .x)
+          ),
+          neighbor_boundary_lengths = purrr::map2(
+            .x = neighbor_boundary_lengths,
+            .y = neighbor_pids,
+            .f = ~ .x[.y %in% hold[[&quot;pid&quot;]]]
+          )
+        )
+    } 
+}</code></pre>
+<p>Finally, I can create a simulation dataset. Here, I simulate data where there is no effect of the exposure by setting the parameters in the outcome model for <code>A</code>, <code>A_tilde</code>, and <code>A:A_tilde</code> to zero:</p>
+<pre class="r"><code>simbasis &lt;- create_sim_basisdata(seed_id = ids[1], km_buffer = 10)
+test &lt;- simulator1(
+  simbasis, 
+  outcome_newparms = c(A = 0, A_tilde = 0, `A:A_tilde` = 0))</code></pre>
+<div id="increasing-confounding" class="section level3">
+<h3>Increasing confounding</h3>
+<p>In the above simulation, a simple linear model which ignores confounding variables seems to recover the truth reasonably well:</p>
+<pre class="r"><code>lm(Y ~ A*A_tilde, data = test)
+## 
+## Call:
+## lm(formula = Y ~ A * A_tilde, data = test)
+## 
+## Coefficients:
+## (Intercept)            A      A_tilde    A:A_tilde  
+##  -5.503e-03   -7.886e-05    1.435e-03    4.526e-04</code></pre>
+<p>However, I can make bias more obvious by twiddling with parameters on confounding variables; e.g.:</p>
+<pre class="r"><code>test &lt;- simulator1(
+  simbasis, 
+  exposure_newparms = c(`log(ha)` = 0.1),
+  outcome_newparms = c(A = 0.0, A_tilde = 0.0, `A:A_tilde` = 0.0, `log(ha)` = 0.1))
+
+lm(Y ~ A*A_tilde, data = test)
+## 
+## Call:
+## lm(formula = Y ~ A * A_tilde, data = test)
+## 
+## Coefficients:
+## (Intercept)            A      A_tilde    A:A_tilde  
+##     0.07557      0.19768      0.03985     -0.01536</code></pre>
+<p>Now, to recover the true effects, we would certainly need methods for estimating causal effects when there is confounding. I don’t show this here, but for example, the <a href="posts/2021-01-19-permutation-weighting-causal/">permutation weighting approach</a> seems promising.</p>
+</div>
+</div>
+</div>
+<div id="summary" class="section level1">
+<h1>Summary</h1>
+<ul>
+<li>I sketched how to create simulators that are realistic (in some sense) to the data that is to be analyzed.</li>
+<li>Some have called this “plasmode” simulation <span class="citation">(see e.g., Gadbury et al. <a href="#ref-gadbury2008evaluating" role="doc-biblioref">2008</a>; Franklin et al. <a href="#ref-franklin2014plasmode" role="doc-biblioref">2014</a>; Liu et al. <a href="#ref-liu2019missing" role="doc-biblioref">2019</a>)</span>.</li>
+<li>An advantage of this approach is that you can test your estimators on data that resembles the analysis data. You can see how the estimators perform under various assumed effect sizes and assumptions but twiddling with parameter settings.</li>
+<li>A limitation of the approach is that the simulation may not make for good “overall” benchmarking of estimators, like <span class="citation">Shimoni et al. (<a href="#ref-shimoni2018benchmarking" role="doc-biblioref">2018</a>)</span> tries to do.</li>
+</ul>
+</div>
+<div id="references" class="section level1 unnumbered">
+<h1>References</h1>
+<div id="refs" class="references hanging-indent">
+<div id="ref-cattell1967general">
+<p>Cattell, Raymond B, and Joseph Jaspers. 1967. “A General Plasmode (No. 30-10-5-2) for Factor Analytic Exercises and Research.” <em>Multivariate Behavioral Research Monographs</em>.</p>
+</div>
+<div id="ref-franklin2014plasmode">
+<p>Franklin, Jessica M, Sebastian Schneeweiss, Jennifer M Polinski, and Jeremy A Rassen. 2014. “Plasmode Simulation for the Evaluation of Pharmacoepidemiologic Methods in Complex Healthcare Databases.” <em>Computational Statistics &amp; Data Analysis</em> 72: 219–26. <a href="https://doi.org/10.1016/j.csda.2013.10.018">https://doi.org/10.1016/j.csda.2013.10.018</a>.</p>
+</div>
+<div id="ref-gadbury2008evaluating">
+<p>Gadbury, Gary L, Qinfang Xiang, Lin Yang, Stephen Barnes, Grier P Page, and David B Allison. 2008. “Evaluating Statistical Methods Using Plasmode Data Sets in the Age of Massive Public Databases: An Illustration Using False Discovery Rates.” <em>PLoS Genet</em> 4 (6): e1000098.</p>
+</div>
+<div id="ref-giffin2020generalized">
+<p>Giffin, Andrew, Brian Reich, Shu Yang, and Ana Rappold. 2020. “Generalized Propensity Score Approach to Causal Inference with Spatial Interference.” <em>arXiv Preprint arXiv:2007.00106</em>.</p>
+</div>
+<div id="ref-liu2019missing">
+<p>Liu, Shao-Hsien, Stavroula A Chrysanthopoulou, Qiuzhi Chang, Jacob N Hunnicutt, and Kate L Lapane. 2019. “Missing Data in Marginal Structural Models: A Plasmode Simulation Study Comparing Multiple Imputation and Inverse Probability Weighting.” <em>Medical Care</em> 57 (3): 237.</p>
+</div>
+<div id="ref-nolte2019voluntary">
+<p>Nolte, Christoph, Spencer R. Meyer, Katharine R. E. Sims, and Jonathan R. Thompson. 2019. “Voluntary, Permanent Land Protection Reduces Forest Loss and Development in a Rural-Urban Landscape.” <em>Conservation Letters</em> 12 (6). <a href="https://doi.org/10.1111/conl.12649">https://doi.org/10.1111/conl.12649</a>.</p>
+</div>
+<div id="ref-osama2019inferring">
+<p>Osama, Muhammad, Dave Zachariah, and Thomas B Schön. 2019. “Inferring Heterogeneous Causal Effects in Presence of Spatial Confounding.” In <em>International Conference on Machine Learning</em>, 4942–50. PMLR.</p>
+</div>
+<div id="ref-reich2020a-review">
+<p>Reich, Brian J, Shu Yang, Yawen Guan, Andrew B Giffin, Matthew J Miller, and Ana G Rappold. 2020. “A Review of Spatial Causal Inference Methods for Environmental and Epidemiological Applications.” <em>arXiv Preprint arXiv:2007.02714</em>.</p>
+</div>
+<div id="ref-robertson2013bas">
+<p>Robertson, BL, JA Brown, Trent McDonald, and Peter Jaksons. 2013. “BAS: Balanced Acceptance Sampling of Natural Resources.” <em>Biometrics</em> 69 (3): 776–84.</p>
+</div>
+<div id="ref-shimoni2018benchmarking">
+<p>Shimoni, Yishai, Chen Yanover, Ehud Karavani, and Yaara Goldschmnidt. 2018. “Benchmarking Framework for Performance-Evaluation of Causal Inference Analysis.” <em>arXiv Preprint arXiv:1802.05046</em>.</p>
+</div>
+<div id="ref-verbitsky-savitz2012causal">
+<p>Verbitsky-Savitz, Natalya, and Stephen W. Raudenbush. 2012. “Causal Inference Under Interference in Spatial Settings: A Case Study Evaluating Community Policing Program in Chicago.” <em>Epidemiologic Methods</em> 1 (1).</p>
+</div>
+<div id="ref-wood2017gam">
+<p>Wood, S. N. 2017. <em>Generalized Additive Models: An Introduction with R</em>. 2nd ed. Chapman; Hall/CRC.</p>
+</div>
+</div>
+</div>
+
+      </div>
+
+
+      <footer>
+        
+
+
+        
+        
+        
+      </footer>
+    </article>
+
+    
+  </section>
+
+      </div>
+
+      
+  <footer class="footer">
+    <section class="container">
+      
+      
+        ©
+        
+          2021 -
+        
+        2022
+         Bradley Saul 
+      
+      
+         · 
+        Powered by <a href="https://gohugo.io/">Hugo</a> & <a href="https://github.com/luizdepra/hugo-coder/">Coder</a>.
+      
+      
+        
+      
+    </section>
+  </footer>
+   
+<script src="/js/math-code.js"></script>
+<script async src="//cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/MathJax.js?config=TeX-MML-AM_CHTML"></script>
+
+   
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/highlight.min.js"></script>
+
+
+
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/r.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/haskell.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/julia.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.12.0/languages/yaml.min.js"></script>
+<script>hljs.configure({languages: []}); hljs.initHighlightingOnLoad();</script>
+
+
+
+
+    </main>
+
+    
+      
+        
+        <script src="/js/dark-mode.min.c2d8a1f8f2660e4a46d776277c72695a1e0ca65939d79f754441d47551604af5.js"></script>
+      
+    
+
+    
+
+    
+
+    <script>
+(function(f, a, t, h, o, m){
+	a[h]=a[h]||function(){
+		(a[h].q=a[h].q||[]).push(arguments)
+	};
+	o=f.createElement('script'),
+	m=f.getElementsByTagName('script')[0];
+	o.async=1; o.src=t; o.id='fathom-script';
+	m.parentNode.insertBefore(o,m)
+})(document, window, '//analytics.example.com/tracker.js', 'fathom');
+fathom('set', 'siteId', 'ABCDE');
+fathom('trackPageview');
+</script>
+
+
+    <script async defer data-domain="example.com" src="https://analytics.example.com/js/plausible.js"></script>
+
+
+    <script data-goatcounter="https://code.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
+
+
+    
+<script defer src='https://static.cloudflareinsights.com/beacon.min.js'
+        data-cf-beacon='{"token": "token"}'></script>
+
+
+  </body>
+
+</html>

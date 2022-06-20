@@ -5,11 +5,7 @@
     <link>http://www.functionalstatistics.com/snippets/</link>
     <description>Recent content in Snippets on Functional Statistics</description>
     <generator>Hugo -- gohugo.io</generator>
-    <language>en</language>
-    
-	<atom:link href="http://www.functionalstatistics.com/snippets/index.xml" rel="self" type="application/rss+xml" />
-    
-    
+    <language>en</language><atom:link href="http://www.functionalstatistics.com/snippets/index.xml" rel="self" type="application/rss+xml" />
     <item>
       <title>First snippet</title>
       <link>http://www.functionalstatistics.com/snippets/first/</link>

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>marginal structural models on Functional Statistics</title>
+    <link>http://www.functionalstatistics.com/tags/marginal-structural-models/</link>
+    <description>Recent content in marginal structural models on Functional Statistics</description>
+    <generator>Hugo -- gohugo.io</generator>
+    <language>en</language>
+    <lastBuildDate>Tue, 16 Feb 2021 09:19:14 -0500</lastBuildDate><atom:link href="http://www.functionalstatistics.com/tags/marginal-structural-models/index.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Permutation Weighting for Estimating Marginal Structural Model Parameters</title>
+      <link>http://www.functionalstatistics.com/posts/2021-02-16-permutation-weighting-marginal-structural-model/</link>
+      <pubDate>Tue, 16 Feb 2021 09:19:14 -0500</pubDate>
+      
+      <guid>http://www.functionalstatistics.com/posts/2021-02-16-permutation-weighting-marginal-structural-model/</guid>
+      <description>A few weeks ago, I demonstrated how permutation weighting (Arbour, Dimmery, and Sondhi 2020) can be used to estimate causal parameters under interference. Today, I show how to use the same idea to estimate parameters in a longitudinal marginal structural model (MSM) (Robins 1999; Robins, Hernán, and Brumback 2000). This post is mostly me proving to myself that it works when combining interference with longitudinal data in a MSM.</description>
+    </item>
+    
+  </channel>
+</rss>
