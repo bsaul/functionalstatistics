@@ -1,0 +1,302 @@
+---
+title: "Linear Regression Via Category Theory"
+author: "Bradley Saul"
+date: 2022-11-02T14:19:14-05:00
+tags: ["Haskell", "R", "statistics", "linear model", "category theory"]
+---
+
+
+
+<p>A couple of years ago,
+I read
+<a href="http://conal.net/">Conal Elliot’s</a>
+<a href="http://conal.net/papers/compiling-to-categories/">Compiling to Categories</a> paper.
+I thought at the time “Wow, this is amazing”,
+but I didn’t have the key that made the ideas concrete for me.
+<a href="https://chrispenner.ca/">Chris Penner’s</a>
+talk on
+<a href="https://www.youtube.com/watch?v=xZmPuz9m2t0">deconstructing lambdas</a>
+unlocked Conal’s paper for me.
+In today’s post,
+I’m making sure I understand the basics by implementing the
+<a href="https://en.wikipedia.org/wiki/Ordinary_least_squares">ordinary least squares estimator</a>
+using categories.</p>
+<p>The key idea of “Compiling to Categories” is right there in the first sentence:</p>
+<blockquote>
+<p>As discovered by <a href="https://en.wikipedia.org/wiki/Joachim_Lambek">Joachim Lambek</a>,
+the models of the simply typed λ-calculus (STLC)
+are exactly the cartesian closed categories (CCC).</p>
+</blockquote>
+<p>In other words, programming in a cartesian closed category <em>is</em>
+programming in a simply typed λ-calculus.
+Or more specifically,
+the STLC/CCC relationship means
+one can program using categories and compile to any language
+that supports a STLC.
+If you’re not familiar with either the λ-calculus or category theory,
+that’s fine.
+My goal here is not to go in depth into the concepts,
+instead I hope my example is a teaser for statisticians
+to engage with category theory.</p>
+<p>For this post I’m going write a single program for the following,
+a formula statisticians will be familiar with:</p>
+<p><span class="math inline">\(\hat{\beta} = (X^{\intercal}X)^{-1}X^{\intercal}Y.\)</span></p>
+<p>Then I will compile this program into multiple target languages, namely
+<a href="https://www.haskell.org/">Haskell</a>
+and
+<a href="https://www.r-project.org/">R</a>.
+The full script for this post is in <a href="Example.hs"><code>Example.hs</code></a>,
+and I’ve included snippets below.</p>
+<div id="categorical-building-blocks" class="section level2">
+<h2>Categorical Building Blocks</h2>
+<p>A category in mathematics is comprised of
+a set of objects,
+a set of arrow (morphisms) between objects,
+and way of composing arrows together subject to certain laws
+(<a href="https://en.wikipedia.org/wiki/Category_theory#Categories,_objects,_and_morphisms">more details for the uninitiated here</a>).
+In Haskell, a category can be represented by a typeclass <code>Category</code>
+where the category is parameterized the type of its arrows.</p>
+<pre class="haskell"><code>class Category k where
+  -- The identity morphism takes an object A and returns A
+  id :: a `k` a
+  -- The composition rule says that for any two morphisms A --&gt; B and B --&gt; C,
+  -- there exists a morphism A --&gt; C. 
+  -- This is encoded by a Haskell function that transforms the morphisms.
+  (&gt;&gt;&gt;) :: a `k` b -&gt; b `k` c -&gt; a `k` c</code></pre>
+<p>Similar to equipping sets with additional structure,
+categories can have additional structure too.
+In particular, a <em>Cartesian</em> category comes equipped with products:
+a way to stick two things together into a pair and get them back out.</p>
+<pre class="haskell"><code>class Category k =&gt; Cartesian k where
+  exl :: (l, r) `k` l
+  exr :: (l, r) `k` r
+  (△) :: a `k` c -&gt; a `k` d -&gt; a `k` (c, d)</code></pre>
+<p>The added structure that products impart is quite useful.
+For example, we now have a way to copy data.</p>
+<pre class="haskell"><code>copy :: (Cartesian k) =&gt;  a `k` (a, a)
+copy = id △ id</code></pre>
+<p>The cartesian structure also provides
+a way to swap the order of elements in a pair.</p>
+<pre class="haskell"><code>swap :: (Cartesian k) =&gt; (a, b) `k` (b, a)
+swap = exr △ exl</code></pre>
+<p>We now have almost all the tools we need in terms of category theory.
+The <a href="https://hackage.haskell.org/package/profunctors-5.6.2/docs/Data-Profunctor.html#t:Strong"><code>Strong</code> class</a>
+provides a way of embedding morphisms within a higher-order structure
+(I’m not sure where the term “strong” comes from).
+Conal’s paper doesn’t use <code>Strong</code> (at least that I can tell),
+but the utilities available once we have it are useful.</p>
+<pre class="haskell"><code>class Category k =&gt; Strong k where
+  first :: a `k` b -&gt; (a, other) `k` (b, other)
+  second :: a `k` b -&gt; (other, a) `k` (other, b)</code></pre>
+<p>Those utilities are
+<code>***</code>
+(which similar to <a href="https://hackage.haskell.org/package/base-4.17.0.0/docs/Data-Bifunctor.html#v:bimap"><code>Data.Bifunctor.bimap</code></a>)
+and
+<code>&amp;&amp;&amp;</code>:</p>
+<pre class="haskell"><code>(***) :: (Category k, Strong k)
+      =&gt; l `k` l&#39;
+      -&gt; r `k` r&#39;
+      -&gt; (l, r) `k` (l&#39;, r&#39;)
+(***) l r = first l &gt;&gt;&gt; second r
+
+(&amp;&amp;&amp;) :: (Cartesian k, Strong k)
+      =&gt; a `k` l
+      -&gt; a `k` r
+      -&gt; a `k` (l, r)
+(&amp;&amp;&amp;) l r = copy &gt;&gt;&gt; (l *** r )</code></pre>
+</div>
+<div id="matrix-primitives" class="section level2">
+<h2>Matrix Primitives</h2>
+<p>Since <a href="https://ncatlab.org/nlab/show/Vect">vector spaces form a category</a>,
+in principle one could encode the following matrix operations
+in a categorical way (as linear maps).
+But for since I’ll be compiling to R and matrices are quite natural in R,
+I’m going to assume that whatever language I compile to
+has the following primitive matrix operations:</p>
+<pre class="haskell"><code>class MatrixPrimitives k where
+  transpose :: (LA.Transposable m mt) =&gt; m `k` mt
+  invert :: (KnownNat n, Domain f v m) =&gt; m n n `k` m n n
+  compose :: (KnownNat n, KnownNat p, KnownNat m) =&gt; (L m p, L p n) `k` L m n</code></pre>
+</div>
+<div id="compilation-of-categories" class="section level2">
+<h2>Compilation of Categories</h2>
+<div id="haskell" class="section level3">
+<h3>Haskell</h3>
+<p>Functions and types in Haskell form a category,
+so defining morphisms is quite straightforward.
+For example, <code>&gt;&gt;&gt;</code> is function composition
+(<code>flip</code>ped from the Haskell default).
+Here <code>P</code> is <code>Prelude</code> and <code>B</code> is <code>Data.Bifunctor</code>.</p>
+<pre class="haskell"><code>instance Category (-&gt;) where
+  id = P.id
+  (&gt;&gt;&gt;) = P.flip (P..)
+
+instance Cartesian (-&gt;) where
+  exl = P.fst
+  exr = P.snd
+  (△) f g x =  (f x, g x)
+
+instance Strong (-&gt;) where
+  first = B.first
+  second = B.second</code></pre>
+<p>For matrix primitives, I use the
+<a href="https://hackage.haskell.org/package/hmatrix"><code>hmatrix</code> package</a>.</p>
+<pre class="haskell"><code>instance MatrixPrimitives (-&gt;) where
+  compose = P.uncurry (&lt;&gt;)
+  transpose = tr
+  invert = inv</code></pre>
+</div>
+<div id="r" class="section level3">
+<h3>R</h3>
+<p>I first define a type <code>R</code> which will contain <code>R</code> expressions as <code>Text</code>.
+This type has two parameters, as <code>Category</code> needs to two parameters.
+But these types are simply bookkeeping when we’re writing Haskell;
+information in these types is not passed to <code>R</code>.</p>
+<pre class="haskell"><code>newtype R a b = MkR T.Text deriving (P.Eq)</code></pre>
+<p>Now I define a way to print the <code>R</code> expressions and write it to a file.</p>
+<pre class="haskell"><code>instance P.Show (R a b) where
+  show (MkR x) = P.show x
+
+genRcode :: R a b -&gt; P.IO ()
+genRcode (MkR x )= T.writeFile &quot;test.R&quot; (&quot;catf &lt;-&quot; P.&lt;&gt; x P.&lt;&gt; &quot;\n&quot;)</code></pre>
+<p>Defining <code>Category</code> for <code>R</code> is where things start to get interesting,
+but again it’s straightforward.
+The <code>id</code> function uses <code>R</code>’s lambda syntax to take <code>x</code> and return <code>x</code>, unchanged.
+The (<code>&gt;&gt;&gt;</code>) operation pattern matches
+on the constructor <code>MkR</code> expressions <code>f</code> and <code>g</code>
+and returns an expression for an <code>R</code> function
+that applies <code>f</code> and then <code>g</code> to its input.
+Note: the <code>[i||]</code> syntax is a
+<a href="https://hackage.haskell.org/package/string-interpolate"><code>string-interpolation</code> quasiquoter</a>.</p>
+<pre class="haskell"><code>instance Category R where
+  id = MkR &quot;\\(x) x&quot;
+  (&gt;&gt;&gt;) (MkR f) (MkR g) = MkR [i|
+  function(x) {
+    f &lt;- #{f}
+    g &lt;- #{g}
+    g(f(x)) 
+  }|]</code></pre>
+<p>The instances for <code>Cartesion</code> and <code>Strong</code> are similar.
+I use <code>list</code> to represent a pair in <code>R</code>.</p>
+<pre class="haskell"><code>instance Cartesian R where
+  exl = MkR &quot;\\(x) x[[1]]&quot;
+  exr = MkR &quot;\\(x) x[[2]]&quot;
+  (△) (MkR f) (MkR g)  = MkR [i|
+  function(x) {
+    f &lt;- #{f}
+    g &lt;- #{g}
+    list(f(x), g(x))
+  }|]
+
+
+instance Strong R where
+  first (MkR f) = MkR [i|
+    function(x) {
+      f &lt;- #{f}
+      x[[1]] &lt;- f(x[[1]])
+      x
+    }
+    |]
+  second (MkR g) = MkR [i|
+    function(x) {
+      g &lt;- #{g}
+      x[[2]] &lt;- g(x[[2]])
+      x
+    }
+    |]</code></pre>
+<p>The <code>R</code> <code>MatrixPrimitives</code> are the usual <code>t</code>, <code>solve</code>, and <code>%*%</code> functions.</p>
+<pre class="haskell"><code>instance MatrixPrimitives R where
+  transpose = MkR &quot;function(x) { t(x) }&quot;
+  invert = MkR &quot;function(x) { solve(x) }&quot;
+  compose = MkR &quot;function(x) { x[[1]] %*% x[[2]] }&quot;</code></pre>
+</div>
+</div>
+<div id="linear-regression-mapping" class="section level2">
+<h2>Linear Regression Mapping</h2>
+<p>We want to express the following in a categorical way:</p>
+<p><span class="math inline">\(\hat{\beta} = (X^{\intercal}X)^{-1}X^{\intercal}Y.\)</span></p>
+<p>Here’s a way to do that:</p>
+<pre class="haskell"><code>lmFit :: (Cartesian k, Strong k, MatrixPrimitives k
+        , KnownNat p, KnownNat n, KnownNat m) =&gt;
+    (L n p, L n m) `k` L p m
+lmFit = 
+  first (copy
+        &gt;&gt;&gt; second ( transpose &gt;&gt;&gt; copy)
+        &gt;&gt;&gt; ((exr &gt;&gt;&gt; exl) △ exl) △ (exr &gt;&gt;&gt; exl)
+        &gt;&gt;&gt; first (compose &gt;&gt;&gt; invert)
+        &gt;&gt;&gt; compose)
+  &gt;&gt;&gt; compose</code></pre>
+<p>This could surely be simplified,
+but the key (for me) in writing the code above
+was to first write <span class="math inline">\(\hat{\beta}\)</span> as a
+<a href="https://ncatlab.org/nlab/show/string+diagram#InLinearAlgebra">string diagram</a>
+(see image below).
+The <code>lmFit</code> code is following along the diagram top to bottom.
+I’ve included the matrix dimensions in the diagram
+to make it easier to see what’s happening.</p>
+<p><img src="string-diagram.jpg" /></p>
+</div>
+<div id="does-it-work" class="section level2">
+<h2>Does it work?</h2>
+<p>Let’s first try a simple example in Haskell
+by taking the average for 4 numbers.
+When the design matrix is a vector of ones,
+<span class="math inline">\(\hat{\beta}\)</span> should simplify to the arithmetic mean.
+Let’s check:</p>
+<pre class="haskell"><code>x = matrix 
+    [ 1
+    , 1
+    , 1
+    , 1] :: L 4 1
+
+y = matrix
+    [ 2
+    , 1
+    , 0
+    , 2] :: L 4 1
+
+test = lmFit (x, y)</code></pre>
+<p>Evaluating <code>test</code> in a <code>ghci</code> session results in:</p>
+<pre class="sh"><code>ghci&gt; test
+(1.25 :: L 1 1)</code></pre>
+<p>Looks good. Let’s try it in <code>R</code>.
+First we create the <code>lmFit</code> value for the <code>R</code> type.
+We have to put something for the matrix dimensions.
+What they are don’t matter;
+they just need to conform.</p>
+<pre class="haskell"><code>r :: (L 4 1, L 4 1) `R` L 1 1
+r = lmFit</code></pre>
+<p>You can view the result in the <a href="test.R"><code>test.R</code> script</a>.
+Testing it out with the same numbers as above:</p>
+<pre class="r"><code>&gt; catf(list(c(1, 1, 1, 1), c(2, 1, 0, 2)))
+     [,1]
+[1,] 1.25</code></pre>
+<p>Neat.
+I’ll end by comparing to the built-in <code>lm</code> with multiple regressors:</p>
+<pre class="r"><code>&gt; X &lt;- matrix(rnorm(100), ncol = 2)
+&gt; Y &lt;- rnorm(50)
+&gt; catf(list(X, Y))
+            [,1]
+[1,]  0.04724210
+[2,] -0.01312188
+&gt; lm(Y ~ -1 + X)
+
+Call:
+lm(formula = Y ~ -1 + X)
+
+Coefficients:
+      X1        X2  
+ 0.04724  -0.01312  </code></pre>
+</div>
+<div id="notes" class="section level2">
+<h2>Notes</h2>
+<ul>
+<li>In principle,
+I could have started with the least squares objective function
+and
+<a href="http://conal.net/papers/essence-of-ad/">automatically derived the solution (i.e. <span class="math inline">\(\hat{\beta}\)</span>)</a>
+using category theory.</li>
+<li>I targeted Haskell and R in my example,
+but one could compile to Python, Javascript, graphs, and much more.</li>
+</ul>
+</div>

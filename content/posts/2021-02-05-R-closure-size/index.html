@@ -1,14 +1,13 @@
 ---
 title: "Closing in on understanding R closures"
 author: "Bradley Saul"
-date: 2021-02-02T09:19:14-05:00
+date: 2021-02-05T09:19:14-05:00
 #categories: ["causal"]
 tags: ["R"]
 editor_options: 
   chunk_output_type: console
 ---
 
-<script src="{{< blogdown/postref >}}index_files/header-attrs/header-attrs.js"></script>
 
 
 <p>A common and useful pattern I use in R programming is <a href="https://en.wikipedia.org/wiki/Currying">currying</a> to create <a href="http://adv-r.had.co.nz/Functional-programming.html#closures">closures</a> for later computation. This pattern is the main abstraction of my <a href="https://github.com/bsaul/geex">geex</a> package, for example. At <a href="https://www.novisci.com/">NoviSci</a> we use closures <em>all the time</em> in data pipelines. I think of a closure as a function <code>f</code> that returns another function <code>g</code>, where the returned <code>g</code> function (hopefully) has the data necessary to do its computation:</p>
@@ -145,9 +144,6 @@ tibble::tibble(
     }
   )
 )</code></pre>
-<pre><code>## Registered S3 method overwritten by &#39;pryr&#39;:
-##   method      from
-##   print.bytes Rcpp</code></pre>
 <p>And what happens after adding more objects to the Global environment:</p>
 <pre class="r"><code>m3 &lt;- glm(mpg ~ 1, data = mtcars)
 m4 &lt;- glm(weight ~ 1, data = ChickWeight)
@@ -255,38 +251,38 @@ tibble::tibble(
 <tr class="odd">
 <td align="left">f0</td>
 <td align="right">9576</td>
-<td align="right">8136</td>
-<td align="right">9416</td>
+<td align="right">8128</td>
+<td align="right">9408</td>
 <td align="right">672</td>
 <td align="right">0.08</td>
-<td align="right">1873</td>
+<td align="right">1933</td>
 <td align="right">11408</td>
-<td align="right">9416</td>
-<td align="right">9416</td>
+<td align="right">9408</td>
+<td align="right">9408</td>
 <td align="right">672</td>
 <td align="right">0.07</td>
-<td align="right">1851</td>
+<td align="right">1909</td>
 <td align="left">TRUE</td>
-<td align="right">13016</td>
+<td align="right">12976</td>
 <td align="right">1262</td>
 </tr>
 <tr class="even">
 <td align="left">f1</td>
 <td align="right">10576</td>
-<td align="right">65928</td>
-<td align="right">66576</td>
+<td align="right">57944</td>
+<td align="right">58592</td>
 <td align="right">672</td>
 <td align="right">0.01</td>
-<td align="right">5438</td>
+<td align="right">5390</td>
 <td align="right">12600</td>
-<td align="right">66576</td>
-<td align="right">66576</td>
+<td align="right">58592</td>
+<td align="right">58592</td>
 <td align="right">672</td>
 <td align="right">0.01</td>
-<td align="right">5438</td>
+<td align="right">5390</td>
 <td align="left">FALSE</td>
-<td align="right">67080</td>
-<td align="right">5456</td>
+<td align="right">59096</td>
+<td align="right">5411</td>
 </tr>
 <tr class="odd">
 <td align="left">f2</td>
@@ -295,34 +291,34 @@ tibble::tibble(
 <td align="right">10408</td>
 <td align="right">672</td>
 <td align="right">0.07</td>
-<td align="right">1229</td>
+<td align="right">1230</td>
 <td align="right">15408</td>
 <td align="right">10408</td>
 <td align="right">10408</td>
 <td align="right">672</td>
 <td align="right">0.06</td>
-<td align="right">1229</td>
+<td align="right">1230</td>
 <td align="left">FALSE</td>
 <td align="right">10408</td>
-<td align="right">1229</td>
+<td align="right">1230</td>
 </tr>
 <tr class="even">
 <td align="left">f3</td>
 <td align="right">15248</td>
-<td align="right">70152</td>
-<td align="right">70800</td>
-<td align="right">58352</td>
-<td align="right">0.83</td>
-<td align="right">6117</td>
+<td align="right">62168</td>
+<td align="right">62816</td>
+<td align="right">50368</td>
+<td align="right">0.81</td>
+<td align="right">6071</td>
 <td align="right">18264</td>
-<td align="right">70800</td>
-<td align="right">70800</td>
-<td align="right">58352</td>
-<td align="right">0.82</td>
-<td align="right">6117</td>
+<td align="right">62816</td>
+<td align="right">62816</td>
+<td align="right">50368</td>
+<td align="right">0.80</td>
+<td align="right">6071</td>
 <td align="left">FALSE</td>
-<td align="right">71304</td>
-<td align="right">6133</td>
+<td align="right">63320</td>
+<td align="right">6090</td>
 </tr>
 <tr class="odd">
 <td align="left">f4</td>
@@ -331,16 +327,16 @@ tibble::tibble(
 <td align="right">13648</td>
 <td align="right">840</td>
 <td align="right">0.07</td>
-<td align="right">1750</td>
+<td align="right">1753</td>
 <td align="right">20160</td>
 <td align="right">13648</td>
 <td align="right">13648</td>
 <td align="right">840</td>
 <td align="right">0.06</td>
-<td align="right">1750</td>
+<td align="right">1753</td>
 <td align="left">FALSE</td>
 <td align="right">13648</td>
-<td align="right">1750</td>
+<td align="right">1753</td>
 </tr>
 <tr class="even">
 <td align="left">f5</td>
@@ -349,34 +345,34 @@ tibble::tibble(
 <td align="right">17832</td>
 <td align="right">672</td>
 <td align="right">0.04</td>
-<td align="right">2397</td>
+<td align="right">2398</td>
 <td align="right">24384</td>
 <td align="right">17832</td>
 <td align="right">17832</td>
 <td align="right">672</td>
 <td align="right">0.04</td>
-<td align="right">2397</td>
+<td align="right">2398</td>
 <td align="left">FALSE</td>
 <td align="right">17832</td>
-<td align="right">2397</td>
+<td align="right">2398</td>
 </tr>
 <tr class="odd">
 <td align="left">f6</td>
 <td align="right">18824</td>
-<td align="right">73512</td>
-<td align="right">74712</td>
-<td align="right">58528</td>
-<td align="right">0.80</td>
-<td align="right">6782</td>
+<td align="right">65528</td>
+<td align="right">66728</td>
+<td align="right">50544</td>
+<td align="right">0.77</td>
+<td align="right">6739</td>
 <td align="right">22208</td>
-<td align="right">74712</td>
-<td align="right">74712</td>
-<td align="right">58528</td>
-<td align="right">0.78</td>
-<td align="right">6782</td>
+<td align="right">66728</td>
+<td align="right">66728</td>
+<td align="right">50544</td>
+<td align="right">0.76</td>
+<td align="right">6739</td>
 <td align="left">FALSE</td>
-<td align="right">75216</td>
-<td align="right">6798</td>
+<td align="right">67232</td>
+<td align="right">6756</td>
 </tr>
 <tr class="even">
 <td align="left">f7</td>
@@ -385,16 +381,16 @@ tibble::tibble(
 <td align="right">17392</td>
 <td align="right">1016</td>
 <td align="right">0.06</td>
-<td align="right">2371</td>
+<td align="right">2372</td>
 <td align="right">23992</td>
 <td align="right">17392</td>
 <td align="right">17392</td>
 <td align="right">1016</td>
 <td align="right">0.06</td>
-<td align="right">2371</td>
+<td align="right">2372</td>
 <td align="left">FALSE</td>
 <td align="right">17392</td>
-<td align="right">2371</td>
+<td align="right">2372</td>
 </tr>
 <tr class="odd">
 <td align="left">f8</td>
@@ -403,16 +399,16 @@ tibble::tibble(
 <td align="right">14816</td>
 <td align="right">672</td>
 <td align="right">0.05</td>
-<td align="right">2004</td>
+<td align="right">2008</td>
 <td align="right">22656</td>
 <td align="right">14816</td>
 <td align="right">14816</td>
 <td align="right">672</td>
 <td align="right">0.05</td>
-<td align="right">2004</td>
+<td align="right">2008</td>
 <td align="left">FALSE</td>
 <td align="right">14816</td>
-<td align="right">2003</td>
+<td align="right">2008</td>
 </tr>
 </tbody>
 </table>

@@ -1,10 +1,10 @@
-# https://discourse.nixos.org/t/r-packages-the-renv-library-manager/5881/2   
 {
   description = "A basic flake for the mbbs package";
   nixConfig = {
     bash-prompt = "funstats> ";
   };
   inputs = {
+    # quarto is only on unstable currently
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
     flake-utils.url = "github:numtide/flake-utils";
   };
@@ -14,10 +14,27 @@
       pkgs = nixpkgs.legacyPackages.${system};
     in {
       devShells.default =  pkgs.mkShell {
-        nativeBuildInputs = [ pkgs.bashInteractive ];
+        nativeBuildInputs = [ 
+          pkgs.bashInteractive
+        ];
         buildInputs = [
+          # required by R packages
+          pkgs.openssl
+          pkgs.gettext
+          pkgs.udunits
+          pkgs.zlib
+          pkgs.hugo
+          
+          # required by Hmatrix
+          pkgs.lapack
+          pkgs.blas
+
           pkgs.R
+          pkgs.rPackages.languageserver
           pkgs.quarto
+
+          pkgs.haskellPackages.haskell-language-server
+          pkgs.haskellPackages.cabal-install
         ];
       }; 
 
