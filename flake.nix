@@ -31,7 +31,7 @@
 
           pkgs.R
           pkgs.rPackages.languageserver
-          pkgs.quarto
+          pkgs.rPackages.renv
 
           pkgs.haskellPackages.haskell-language-server
           pkgs.haskellPackages.cabal-install

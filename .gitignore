@@ -8,6 +8,7 @@
 # Build artifacts
 dist-newstyle**
 .hugo*
+public**
 
 # Etc
 *DS_Store
