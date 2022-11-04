@@ -1,6 +1,13 @@
+# R artifacts
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
 *Rproj
+
+# Build artifacts
+dist-newstyle**
+.hugo*
+
+# Etc
 *DS_Store
