@@ -365,3 +365,7 @@ _ =  ( λ _ → tt )
         ; {Banana} _ → inj₂ (inj₂ refl)
         } 
 ```
+
+## Fin
+
+I hope to share more of my Agda learnings in the coming weeks.
