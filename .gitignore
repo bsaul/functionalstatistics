@@ -9,6 +9,7 @@
 dist-newstyle**
 .hugo*
 public**
+*.adgai 
 
 # Etc
 *DS_Store

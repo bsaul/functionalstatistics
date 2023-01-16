@@ -19,7 +19,9 @@ ignoreFiles = [ "\\.Rmd$"
                 , "\\.knit\\.md$"
                 , "\\.utf8\\.md$"
                 , "(^|/)renv$"
-                , "renv\\.lock$"]
+                , "renv\\.lock$"
+                , "\\.agdai"
+                ]
 
 [params]
     author = "Bradley Saul"
