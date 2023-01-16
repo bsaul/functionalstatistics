@@ -35,6 +35,9 @@
 
           pkgs.haskellPackages.haskell-language-server
           pkgs.haskellPackages.cabal-install
+
+          # adga
+          (pkgs.agda.withPackages [ pkgs.agdaPackages.standard-library ])
         ];
       }; 
 
