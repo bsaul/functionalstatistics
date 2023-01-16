@@ -75,8 +75,6 @@ and here's a description from the
 -- informs much of the notation used below.
 ```
 
-
-
 ## Setup
 
 <details>
@@ -141,7 +139,7 @@ This should hopefully be easy to prove.
 
 ### Set inclusion
 
-#### $Orange \in \{ Orange \}$
+#### \(Orange \in \{ Orange \}\)
 
 Indeed, to prove the proposition,
 we state `refl`,
@@ -164,7 +162,7 @@ might make it easier to see what's going on:
 
 Proof of the statement `Orange = Orange` is `refl`.
 
-#### $\neg ( Banana \in \{ Orange \} )$
+#### \(\neg ( Banana \in \{ Orange \} )\)
 
 The claim $Banana \in \{ Orange \}$ should not hold; 
 i.e., we should be able to construct a proof of the negation of the claim.
@@ -196,7 +194,7 @@ _ :  Banana ∉ ｛ Orange ｝
 _ = λ()
 ```
 
-#### $Orange \in \{ Orange, Apple \}$
+#### \(Orange \in \{ Orange, Apple \}\)
 
 Now I move beyond singleton sets and
 define a subset containing both $Orange$ and $Apple$.
@@ -227,7 +225,7 @@ see the
 [Disjunction as Sum section](https://plfa.github.io/Connectives/#disjunction-is-sum)
 in PLFA.
 
-#### $Orange \in \{ Orange, Apple, Banana \}$
+#### \(Orange \in \{ Orange, Apple, Banana \}\)
 
 The [`U` symbol](https://agda.github.io/agda-stdlib/Relation.Unary.html#1391) 
 represents the univeral set for a type. 
@@ -274,7 +272,7 @@ _⊆_ : Pred A ℓ₁ → Pred A ℓ₂ → Set _
 P ⊆ Q = ∀ {x} → x ∈ P → x ∈ Q
 ```
 
-#### $\{ Orange, Apple \} \subseteq \{ Orange, Apple, Banana \}$
+#### \(\{ Orange, Apple \} \subseteq \{ Orange, Apple, Banana \}\)
 
 The first one is simple:
 
@@ -283,7 +281,7 @@ _ : O∪A ⊆ allFruit
 _ = λ _  → tt 
 ```
 
-#### $\{ Orange \} \cap \{ Orange, Apple \} \subseteq \{ Orange \}$
+#### \(\{ Orange \} \cap \{ Orange, Apple \} \subseteq \{ Orange \}\)
 
 ```agda
 _ : ( ｛ Orange ｝ ∩ O∪A ) ⊆ ｛ Orange ｝
@@ -308,7 +306,7 @@ Note that I could just as well have written:
 The name of lambda variable is irrelevant,
 but I used the name `｛O｝∩O∪A` to give a visual cue what type is being passed. 
 
-#### $\{ Banana \} \not\subseteq \{ Orange, Apple \}$
+#### \(\{ Banana \} \not\subseteq \{ Orange, Apple \}\)
 
 This one is little trickier:
 
@@ -339,7 +337,7 @@ I won't go through these in detail.
 I will reiterate that proof in each case involves producing a pair proofs,
 one for `P ⊆ Q` and another for `Q ⊆ P`.
 
-#### $\{ Orange \} \cap \{ Orange, Apple, Banana \} = \{ Orange \}$
+#### \(\{ Orange \} \cap \{ Orange, Apple, Banana \} = \{ Orange \}\)
 
 ```agda
 _ : ( ｛ Orange ｝ ∩ allFruit ) ≐ ( ｛ Orange ｝ )
@@ -347,7 +345,7 @@ _ =   (λ ( o∈O , _ ) → o∈O )
     , ( λ o∈O →  o∈O , tt )  
 ```
 
-#### $\{ Orange \} \cap \{ Apple \} = \emptyset$
+#### \(\{ Orange \} \cap \{ Apple \} = \emptyset\)
 
 ```agda
 _ :  ( ｛ Orange ｝ ∩ ｛ Apple ｝ ) ≐ ∅
@@ -355,7 +353,7 @@ _ =   ( λ { (refl , ())})
     , ( λ () )
 ```
 
-#### $\{ Orange \} \cup \{ Apple \} \cup \{ Banana \} = \bigcup$
+#### \(\{ Orange \} \cup \{ Apple \} \cup \{ Banana \} = \bigcup\)
 
 ```agda
 _ :  ( ｛ Orange ｝ ∪ ｛ Apple ｝ ∪ ｛ Banana ｝ ) ≐ allFruit
