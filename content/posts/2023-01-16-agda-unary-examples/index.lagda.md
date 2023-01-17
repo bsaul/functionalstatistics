@@ -2,7 +2,7 @@
 title: Unary Relation Examples
 author: "Bradley Saul"
 date: 2023-01-16T14:02:14-05:00
-tags: ["adga"]
+tags: ["agda"]
 ---
 
 Lately I've been learning the dependently typed programming language
@@ -117,9 +117,9 @@ open import Data.Sum.Base using (_⊎_; inj₁ ; inj₂ ; [_,_]′ )
 
 Here's the three element set I'll work with in the examples:
 
-\[
+\(
   \{ Orange, Apple, Banana \}
-\]
+\)
 
 This set can be defined in adga as a
 [simple datatype](https://agda.readthedocs.io/en/latest/language/data-types.html#simple-datatypes):
