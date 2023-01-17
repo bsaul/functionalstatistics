@@ -118,7 +118,7 @@ open import Data.Sum.Base using (_⊎_; inj₁ ; inj₂ ; [_,_]′ )
 Here's the three element set I'll work with in the examples:
 
 \(
-  \{ Orange, Apple, Banana \}
+\{ Orange, Apple, Banana \}
 \)
 
 This set can be defined in adga as a
