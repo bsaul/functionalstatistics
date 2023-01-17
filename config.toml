@@ -23,6 +23,10 @@ ignoreFiles = [ "\\.Rmd$"
                 , "\\.agdai"
                 ]
 
+# Do not omit raw HTML
+[markup.goldmark.renderer]
+unsafe= true
+
 [params]
     author = "Bradley Saul"
     description = "Functional Programming, Causal Inference, Ecology and Conservation"
