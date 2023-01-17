@@ -5,6 +5,7 @@ date: 2023-01-16T14:02:14-05:00
 tags: ["agda"]
 ---
 
+
 <p>Lately I’ve been learning the dependently typed programming language
 <a
 href="https://agda.readthedocs.io/en/latest/getting-started/what-is-agda.html">Agda</a>.
@@ -84,7 +85,9 @@ class="sourceCode agda"><code class="sourceCode agda"><span id="cb5-1"><a href="
 </details>
 <h2 id="example-set">Example Set</h2>
 <p>Here’s the three element set I’ll work with in the examples:</p>
-<p>( { Orange, Apple, Banana } )</p>
+<p><span class="math display">\[
+\{ Orange, Apple, Banana \}
+\]</span></p>
 <p>This set can be defined in adga as a <a
 href="https://agda.readthedocs.io/en/latest/language/data-types.html#simple-datatypes">simple
 datatype</a>:</p>
@@ -99,7 +102,8 @@ class="math inline">\(Orange\)</span> is in the singleton set containing
 <span class="math inline">\(Orange\)</span>. This should hopefully be
 easy to prove.</p>
 <h3 id="set-inclusion">Set inclusion</h3>
-<h4 id="orange-orange">(Orange { Orange })</h4>
+<h4 id="orange-in-orange"><span class="math inline">\(Orange \in \{
+Orange \}\)</span></h4>
 <p>Indeed, to prove the proposition, we state <code>refl</code>, which
 stands for <a
 href="https://en.wikipedia.org/wiki/Reflexive_relation">reflexity</a>.</p>
@@ -113,7 +117,8 @@ going on:</p>
 ==  Orange = Orange      ( ｛ x ｝ = x ≡_) </code></pre>
 <p>Proof of the statement <code>Orange = Orange</code> is
 <code>refl</code>.</p>
-<h4 id="banana-orange">(( Banana { Orange } ))</h4>
+<h4 id="neg-banana-in-orange"><span class="math inline">\(\neg ( Banana
+\in \{ Orange \} )\)</span></h4>
 <p>The claim <span class="math inline">\(Banana \in \{ Orange
 \}\)</span> should not hold; i.e., we should be able to construct a
 proof of the negation of the claim.</p>
@@ -137,7 +142,8 @@ href="https://agda.github.io/agda-stdlib/Relation.Unary.html#1563"><code>_∉_</
 <div class="sourceCode" id="cb10"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb10-1"><a href="#cb10-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span>  Banana ∉ ｛ Orange ｝ </span>
 <span id="cb10-2"><a href="#cb10-2" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">=</span> <span class="ot">λ()</span></span></code></pre></div>
-<h4 id="orange-orange-apple">(Orange { Orange, Apple })</h4>
+<h4 id="orange-in-orange-apple"><span class="math inline">\(Orange \in
+\{ Orange, Apple \}\)</span></h4>
 <p>Now I move beyond singleton sets and define a subset containing both
 <span class="math inline">\(Orange\)</span> and <span
 class="math inline">\(Apple\)</span>. This is straighforward with the
@@ -158,8 +164,9 @@ class="sourceCode agda"><code class="sourceCode agda"><span id="cb12-1"><a href=
 <p>For more on the sum type, see the <a
 href="https://plfa.github.io/Connectives/#disjunction-is-sum">Disjunction
 as Sum section</a> in PLFA.</p>
-<h4 id="orange-orange-apple-banana">(Orange { Orange, Apple, Banana
-})</h4>
+<h4 id="orange-in-orange-apple-banana"><span
+class="math inline">\(Orange \in \{ Orange, Apple, Banana
+\}\)</span></h4>
 <p>The <a
 href="https://agda.github.io/agda-stdlib/Relation.Unary.html#1391"><code>U</code>
 symbol</a> represents the univeral set for a type. I find that symbol
@@ -193,14 +200,16 @@ relations.</p>
 in <code>Q</code>. Or in agda:</p>
 <pre class="text"><code>_⊆_ : Pred A ℓ₁ → Pred A ℓ₂ → Set _
 P ⊆ Q = ∀ {x} → x ∈ P → x ∈ Q</code></pre>
-<h4 id="orange-apple-orange-apple-banana">({ Orange, Apple } { Orange,
-Apple, Banana })</h4>
+<h4 id="orange-apple-subseteq-orange-apple-banana"><span
+class="math inline">\(\{ Orange, Apple \} \subseteq \{ Orange, Apple,
+Banana \}\)</span></h4>
 <p>The first one is simple:</p>
 <div class="sourceCode" id="cb17"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb17-1"><a href="#cb17-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span> O∪A ⊆ allFruit</span>
 <span id="cb17-2"><a href="#cb17-2" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">=</span> <span class="ot">λ</span> <span class="ot">_</span>  <span class="ot">→</span> tt </span></code></pre></div>
-<h4 id="orange-orange-apple-orange">({ Orange } { Orange, Apple } {
-Orange })</h4>
+<h4 id="orange-cap-orange-apple-subseteq-orange"><span
+class="math inline">\(\{ Orange \} \cap \{ Orange, Apple \} \subseteq \{
+Orange \}\)</span></h4>
 <div class="sourceCode" id="cb18"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb18-1"><a href="#cb18-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span> <span class="ot">(</span> ｛ Orange ｝ ∩ O∪A <span class="ot">)</span> ⊆ ｛ Orange ｝</span>
 <span id="cb18-2"><a href="#cb18-2" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">=</span> <span class="ot">λ</span> ｛O｝∩O∪A <span class="ot">→</span> proj₁ ｛O｝∩O∪A</span></code></pre></div>
@@ -216,7 +225,8 @@ exactly what I wrote. Note that I could just as well have written:
 <code>λ x → proj₁ x</code>. The name of lambda variable is irrelevant,
 but I used the name <code>｛O｝∩O∪A</code> to give a visual cue what
 type is being passed.</p>
-<h4 id="banana-orange-apple">({ Banana } { Orange, Apple })</h4>
+<h4 id="banana-notsubseteq-orange-apple"><span class="math inline">\(\{
+Banana \} \not\subseteq \{ Orange, Apple \}\)</span></h4>
 <p>This one is little trickier:</p>
 <div class="sourceCode" id="cb20"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb20-1"><a href="#cb20-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span> ｛ Banana ｝ ⊈ O∪A </span>
@@ -236,18 +246,22 @@ class="sourceCode agda"><code class="sourceCode agda"><span id="cb21-1"><a href=
 <p>I won’t go through these in detail. I will reiterate that proof in
 each case involves producing a pair proofs, one for <code>P ⊆ Q</code>
 and another for <code>Q ⊆ P</code>.</p>
-<h4 id="orange-orange-apple-banana-orange">({ Orange } { Orange, Apple,
-Banana } = { Orange })</h4>
+<h4 id="orange-cap-orange-apple-banana-orange"><span
+class="math inline">\(\{ Orange \} \cap \{ Orange, Apple, Banana \} = \{
+Orange \}\)</span></h4>
 <div class="sourceCode" id="cb22"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb22-1"><a href="#cb22-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span> <span class="ot">(</span> ｛ Orange ｝ ∩ allFruit <span class="ot">)</span> ≐ <span class="ot">(</span> ｛ Orange ｝ <span class="ot">)</span></span>
 <span id="cb22-2"><a href="#cb22-2" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">=</span>   <span class="ot">(λ</span> <span class="ot">(</span> o∈O , <span class="ot">_</span> <span class="ot">)</span> <span class="ot">→</span> o∈O <span class="ot">)</span> </span>
 <span id="cb22-3"><a href="#cb22-3" aria-hidden="true" tabindex="-1"></a>    , <span class="ot">(</span> <span class="ot">λ</span> o∈O <span class="ot">→</span>  o∈O , tt <span class="ot">)</span>  </span></code></pre></div>
-<h4 id="orange-apple">({ Orange } { Apple } = )</h4>
+<h4 id="orange-cap-apple-emptyset"><span class="math inline">\(\{ Orange
+\} \cap \{ Apple \} = \emptyset\)</span></h4>
 <div class="sourceCode" id="cb23"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb23-1"><a href="#cb23-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span>  <span class="ot">(</span> ｛ Orange ｝ ∩ ｛ Apple ｝ <span class="ot">)</span> ≐ ∅</span>
 <span id="cb23-2"><a href="#cb23-2" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">=</span>   <span class="ot">(</span> <span class="ot">λ</span> <span class="ot">{</span> <span class="ot">(</span>refl , <span class="ot">())})</span> </span>
 <span id="cb23-3"><a href="#cb23-3" aria-hidden="true" tabindex="-1"></a>    , <span class="ot">(</span> <span class="ot">λ</span> <span class="ot">()</span> <span class="ot">)</span></span></code></pre></div>
-<h4 id="orange-apple-banana">({ Orange } { Apple } { Banana } = )</h4>
+<h4 id="orange-cup-apple-cup-banana-bigcup"><span
+class="math inline">\(\{ Orange \} \cup \{ Apple \} \cup \{ Banana \} =
+\bigcup\)</span></h4>
 <div class="sourceCode" id="cb24"><pre
 class="sourceCode agda"><code class="sourceCode agda"><span id="cb24-1"><a href="#cb24-1" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">:</span>  <span class="ot">(</span> ｛ Orange ｝ ∪ ｛ Apple ｝ ∪ ｛ Banana ｝ <span class="ot">)</span> ≐ allFruit</span>
 <span id="cb24-2"><a href="#cb24-2" aria-hidden="true" tabindex="-1"></a><span class="ot">_</span> <span class="ot">=</span>  <span class="ot">(</span> <span class="ot">λ</span> <span class="ot">_</span> <span class="ot">→</span> tt <span class="ot">)</span> </span>
